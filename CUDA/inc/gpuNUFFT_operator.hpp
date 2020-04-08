@@ -122,6 +122,10 @@ class GpuNUFFTOperator
   }
 
   // GETTER
+  DType getOsf()
+  {
+    return this->osf;
+  }
   Array<DType> getKSpaceTraj()
   {
     return this->kSpaceTraj;
