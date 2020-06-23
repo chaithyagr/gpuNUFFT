@@ -30,7 +30,7 @@ void sortArrays(gpuNUFFT::GpuNUFFTOperator *gpuNUFFTOp,
                 std::vector<gpuNUFFT::IndPair> assignedSectorsAndIndicesSorted,
                 IndType *assignedSectors, IndType *dataIndices,
                 gpuNUFFT::Array<DType> &kSpaceTraj, DType *trajSorted,
-                DType *densCompData, DType *densData);
+                DType *densCompData, gpuNUFFT::Array<DType> &densData);
 
 /**
   * \brief Select input array in order defined by data_indices.

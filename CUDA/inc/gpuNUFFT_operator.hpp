@@ -45,7 +45,7 @@ class GpuNUFFTOperator
                    bool matlabSharedMem = false)
     : operatorType(operatorType), osf(osf), kernelWidth(kernelWidth),
       sectorWidth(sectorWidth), imgDims(imgDims), gpuMemAllocated(false),
-      debugTiming(DEBUG), sens_d(NULL), crds_d(NULL), density_comp_d(NULL),
+      debugTiming(true), sens_d(NULL), crds_d(NULL), density_comp_d(NULL),
       deapo_d(NULL), gdata_d(NULL), sector_centers_d(NULL), sectors_d(NULL),
       data_indices_d(NULL), data_sorted_d(NULL), allocatedCoils(0),
       matlabSharedMem(matlabSharedMem)

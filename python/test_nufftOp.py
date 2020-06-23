@@ -9,6 +9,7 @@ import numpy.matlib
 import matplotlib.pyplot as plt
 from gpuNUFFT import NUFFTOp
 import unittest
+import time
 
 
 class TestgpuNUFFT(unittest.TestCase):
@@ -36,60 +37,38 @@ class TestgpuNUFFT(unittest.TestCase):
                         multichannel tests
         """
         # IMAGE
-        self.img_size = [64, 128]
-        [x, y] = np.meshgrid(np.linspace(-1, 1, self.img_size[0]),
-                                np.linspace(-1, 1, self.img_size[1]))
-        img = (x**2 + y**2  < 0.5**2).T
+        np.random.seed(0)
+        self.img_size = [384, 384, 208]
+        [x, y, z] = np.meshgrid(np.linspace(-1, 1, self.img_size[0]),
+                                np.linspace(-1, 1, self.img_size[1]),
+                                np.linspace(-1, 1, self.img_size[2]))
+        img = (x**2 + y**2 + z**2 < 0.5**2)
         self.img = img.astype(np.complex64)
-        plt.figure(1)
-        plt.imshow(abs(img[...]), aspect='equal')
-        plt.title('image')
-        plt.show()
-        print('Input image shape is', img.shape)
 
         # KCOORDS
-        R = 1
-        n_lines = self.img_size[1] // R
-        ns_per_line = self.img_size[0]
-        self.kspace_loc = np.ones([ns_per_line * n_lines, 2])
-        readout_line = np.linspace(-0.5, 0.5, ns_per_line)
-        self.kspace_loc[:, 0] = np.matlib.repmat(readout_line, 1, n_lines)
-        self.kspace_loc[:, 1] = np.matlib.repmat(np.linspace(-0.5, 0.5, n_lines), ns_per_line, 1).T.reshape(-1)
-        print('Input kcoords shape is', self.kspace_loc.shape)
+        self.kspace_loc = np.random.random((4096*4096, 3))
 
         # WEIGHTS
         self.weights = np.ones(self.kspace_loc.shape[0])
         print('Input weights shape is', self.weights.shape)
 
         # COIL MAPS
-        self.n_coils = 2
-        x, y = np.meshgrid(np.linspace(0, 1, self.img_size[0]), np.linspace(0, 1, self.img_size[1]))
-        coil_maps_1 = ((1 / (x**2 + y**2 + 1)).T).astype(np.complex64)
-        coil_maps_2 = np.flip(np.flip(coil_maps_1, axis=1), axis=0)
-        self.multi_img = np.tile(img, (self.n_coils, 1, 1))
-        if self.n_coils == 1:
-            self.coil_maps = np.expand_dims(coil_maps_1, axis=0)
-            plt.imshow(abs(coil_maps_1), aspect='equal')
-            plt.title('coil map')
-            plt.show()
-        elif self.n_coils == 2:
-            self.coil_maps = np.stack([coil_maps_1, coil_maps_2])
-            fig, axs = plt.subplots(nrows=1, ncols=2)
-            axs[0].imshow(abs(coil_maps_1), aspect='equal')
-            axs[0].set_title('coil map 1')
-            axs[1].imshow(abs(coil_maps_2), aspect='equal')
-            axs[1].set_title('coil map 2')
-            plt.show()
+        self.n_coils = 42
+        coil_maps = ((1 / (x**2 + y**2 + z**2 + 1))).astype(np.complex64)
+        self.smaps = np.tile(coil_maps, (self.n_coils, 1, 1, 1))
+        self.multi_img = np.tile(img, (self.n_coils, 1, 1, 1))
 
     def test_multicoil_with_sense(self):
         print('Apply forward op')
-        operator = self.get_nufft_op(self.coil_maps)
+        operator = self.get_nufft_op(self.smaps)
         x = operator.op(np.reshape(self.img.T, self.img.size))
         y = np.random.random(x.shape)
         print('Output kdata shape is', x.shape)
         print('-------------------------------')
         print('Apply adjoint op')
+        st = time.time()
         img_adj = operator.adj_op(x)
+        print(time.time() - st)
         adj_y = operator.adj_op(y)
         print('Output adjoint img shape is', img_adj.shape)
         img_adj = np.squeeze(img_adj).T
@@ -115,7 +94,9 @@ class TestgpuNUFFT(unittest.TestCase):
         print('Output kdata shape is', x.shape)
         print('-------------------------------')
         print('Apply adjoint op')
+        st = time.time()
         img_adj = operator.adj_op(x)
+        print(time.time() - st)
         print('Output adjoint img shape is', img_adj.shape)
         img_adj = np.squeeze(img_adj)
         img_adj = np.asarray(

@@ -476,7 +476,7 @@ gpuNUFFT::GpuNUFFTOperatorFactory::createGpuNUFFTOperator(
 
   Array<DType> densData;
   if (densCompData.data != NULL)
-    densData = initDensData(gpuNUFFTOp, coordCnt);
+    densData = initDensData(gpuNUFFTOp, densCompData.dim.count());
 
   if (sensData.data != NULL)
     gpuNUFFTOp->setSens(sensData);
@@ -485,7 +485,7 @@ gpuNUFFT::GpuNUFFTOperatorFactory::createGpuNUFFTOperator(
   {
     sortArrays(gpuNUFFTOp, assignedSectorsAndIndicesSorted,
                assignedSectors.data, dataIndices.data, kSpaceTraj,
-               trajSorted.data, densCompData.data, densData.data);
+               trajSorted.data, densCompData.data, densData);
   }
   else
   {

@@ -155,6 +155,22 @@ __global__ void sensMulKernel(CufftType* imdata, DType2* sens, int N)
   }
 }
 
+__global__ void w0MulKernel(CufftType* res_data, CufftType* imdata, DType2* w0, int N)
+{
+  int t = threadIdx.x +  blockIdx.x * blockDim.x;
+  int l = blockIdx.y;
+  while (t < N)
+  {
+    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    {
+      CufftType data_p = imdata[t + c*N];
+      res_data[t + c*N].x += data_p.x * w0[t + l*N].x - data_p.y * w0[t + l*N].y; //Re
+      res_data[t + c*N].y += data_p.x * w0[t + l*N].y + data_p.y * w0[t + l*N].x; //Im
+    }
+    t = t+ blockDim.x*gridDim.x;
+  }
+
+}
 __global__ void conjSensMulKernel(CufftType* imdata, DType2* sens, int N)
 {
   int t = threadIdx.x +  blockIdx.x *blockDim.x;
@@ -220,14 +236,13 @@ void performSensSum(CufftType* imdata_d,
 __global__ void densityCompensationKernel(DType2* data, DType* density_comp, int N)
 {
   int t = threadIdx.x +  blockIdx.x *blockDim.x;
-
-  while (t < N) 
+  while (t < N)
   {
     for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
     {
       DType2 data_p = data[t + c*N]; 
-      data_p.x = data_p.x * sqrt(density_comp[t]);
-      data_p.y = data_p.y * sqrt(density_comp[t]);
+      data_p.x = data_p.x * density_comp[t];
+      data_p.y = data_p.y * density_comp[t];
       data[t + c*N] = data_p;
     }
     t = t+ blockDim.x*gridDim.x;

@@ -87,8 +87,6 @@ __global__ void sortArraysKernel(gpuNUFFT::IndPair* assignedSectorsAndIndicesSor
   IndType* dataIndices,
   DType* kSpaceTraj,
   DType* trajSorted,
-  DType* densCompData,
-  DType* densData,
   bool is3DProcessing,
   long coordCnt)
 {
@@ -101,16 +99,28 @@ __global__ void sortArraysKernel(gpuNUFFT::IndPair* assignedSectorsAndIndicesSor
     if (is3DProcessing)
       trajSorted[t + 2*coordCnt] = kSpaceTraj[assignedSectorsAndIndicesSorted[t].first + 2*coordCnt];
 
-    //sort density compensation
-    if (densCompData != NULL)
-      densData[t] = densCompData[assignedSectorsAndIndicesSorted[t].first];
-
     dataIndices[t] = assignedSectorsAndIndicesSorted[t].first;
     assignedSectors[t] = assignedSectorsAndIndicesSorted[t].second;		
 
     t = t+ blockDim.x*gridDim.x;
   }
 }
+
+__global__ void sortDensityArrayKernel(gpuNUFFT::IndPair* assignedSectorsAndIndicesSorted,
+  DType* densCompData,
+  DType* densData,
+  long coordCnt,
+  int n_interpolators)
+{
+  int t = threadIdx.x +  blockIdx.x *blockDim.x;
+  int interpolator_id = threadIdx.y +  blockIdx.y * blockDim.y;
+  while (t < coordCnt)
+  {
+    densData[t + interpolator_id*coordCnt] = densCompData[assignedSectorsAndIndicesSorted[t].first + interpolator_id*coordCnt];
+    t = t+ blockDim.x*gridDim.x;
+  }
+}
+
 
 void sortArrays(gpuNUFFT::GpuNUFFTOperator* gpuNUFFTOp, 
   std::vector<gpuNUFFT::IndPair> assignedSectorsAndIndicesSorted,
@@ -119,9 +129,11 @@ void sortArrays(gpuNUFFT::GpuNUFFTOperator* gpuNUFFTOp,
   gpuNUFFT::Array<DType>& kSpaceTraj,
   DType* trajSorted,
   DType* densCompData,
-  DType* densData)
+  gpuNUFFT::Array<DType>& densData)
 {
   IndType coordCnt = kSpaceTraj.count();
+  IndType densCnt = densData.count();
+  int n_interpolators = densCnt / coordCnt;
   dim3 block_dim(THREAD_BLOCK_SIZE);
   dim3 grid_dim(getOptimalGridDim((long)coordCnt,THREAD_BLOCK_SIZE));
 
@@ -145,8 +157,8 @@ void sortArrays(gpuNUFFT::GpuNUFFTOperator* gpuNUFFTOp,
   //Density compensation data and sorted result
   if (densCompData != NULL)
   {
-    allocateAndCopyToDeviceMem<DType>(&densCompData_d,densCompData,coordCnt);
-    allocateDeviceMem<DType>(&densData_d,coordCnt);
+    allocateAndCopyToDeviceMem<DType>(&densCompData_d,densCompData,densCnt);
+    allocateDeviceMem<DType>(&densData_d,densCnt);
   }
 
   if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
@@ -157,10 +169,15 @@ void sortArrays(gpuNUFFT::GpuNUFFTOperator* gpuNUFFTOp,
     dataIndices_d,
     kSpaceTraj_d,
     trajSorted_d,
-    densCompData_d,
-    densData_d,
     gpuNUFFTOp->is3DProcessing(),
     (long)coordCnt);
+  grid_dim.y = n_interpolators;
+  sortDensityArrayKernel<<<grid_dim,block_dim>>>( assignedSectorsAndIndicesSorted_d,
+    densCompData_d,
+    densData_d,
+    (long)coordCnt,
+    n_interpolators);
+
   if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
     printf("error: at sortArrays thread synchronization 1: %s\n",cudaGetErrorString(cudaGetLastError()));
 
@@ -168,7 +185,7 @@ void sortArrays(gpuNUFFT::GpuNUFFTOperator* gpuNUFFTOp,
   copyFromDevice<IndType>(dataIndices_d,dataIndices,coordCnt);
   copyFromDevice<DType>(trajSorted_d,trajSorted,gpuNUFFTOp->getImageDimensionCount()*coordCnt);
   if (densCompData != NULL)
-    copyFromDevice<DType>(densData_d,densData,coordCnt);
+    copyFromDevice<DType>(densData_d, densData.data, densCnt);
 
   if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
     printf("error: at sortArrays thread synchronization 2: %s\n",cudaGetErrorString(cudaGetLastError()));

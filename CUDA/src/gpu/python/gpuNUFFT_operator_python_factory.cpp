@@ -61,7 +61,7 @@ class GpuNUFFTPythonOperator
 {
     gpuNUFFT::GpuNUFFTOperatorFactory factory;
     gpuNUFFT::GpuNUFFTOperator *gpuNUFFTOp;
-    int trajectory_length, n_coils, dimension;
+    int trajectory_length, n_coils, dimension, n_interpolators;
     bool has_sense_data;
     gpuNUFFT::Dimensions imgDims;
     // sensitivity maps
@@ -80,7 +80,9 @@ class GpuNUFFTPythonOperator
 
         // density compensation weights
         gpuNUFFT::Array<DType> density_compArray = readNumpyArray(density_comp);
-        density_compArray.dim.length = trajectory_length;
+        py::buffer_info interpolator_info = density_comp.request();
+        n_interpolators = interpolator_info.shape[0];
+        density_compArray.dim.length = trajectory_length * interpolator_info.shape[0];
 
         // image size
         py::buffer_info img_dim = image_size.request();
@@ -103,9 +105,9 @@ class GpuNUFFTPythonOperator
         }
         else
         {
-            sensArray = copyNumpyArray(sense_maps, imgDims.count() * n_coils);
+            sensArray = copyNumpyArray(sense_maps, imgDims.count() * n_interpolators);
             sensArray.dim = imgDims;
-            sensArray.dim.channels = n_coils;
+            sensArray.dim.channels = n_interpolators;
             has_sense_data = true;
         }
         factory.setBalanceWorkload(balance_workload);

@@ -1087,6 +1087,7 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
                                       n_coils, kspaceData.dim),
                                   16)
                        : 1;
+  int n_interpolators_cc = 1;
   if (DEBUG)
     printf("Computing %d coils concurrently.\n", n_coils_cc);
 
