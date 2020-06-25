@@ -240,7 +240,7 @@ struct GpuNUFFTInfo
   int kernel_count;
   /**\brief Radius of kernel relative to grid size.*/
   DType kernel_radius;
-
+  int n_interpolators;
   /**\brief Width of oversampled grid.*/
   int grid_width_dim;
   /**\brief .*/

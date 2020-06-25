@@ -98,10 +98,9 @@ class GpuNUFFTPythonOperator
 
         // sensitivity maps
         py::buffer_info sense_maps_buffer = sense_maps.request();
-        if (sense_maps_buffer.shape.size()==0)
+        if (sense_maps_buffer.shape[0] != n_interpolators)
         {
-            has_sense_data = false;
-            sensArray.data = NULL;
+            printf("ERROR: Bad W0 matrix\n");
         }
         else
         {

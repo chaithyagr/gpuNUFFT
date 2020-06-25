@@ -72,6 +72,8 @@ gpuNUFFT::GpuNUFFTOperator::initGpuNUFFTInfo(int n_coils_cc)
   gi_host->im_width_offset.y = (int)(floor(imgDims.height / (DType)2.0));
   gi_host->im_width_offset.z = (int)(floor(imgDims.depth / (DType)2.0));
 
+  gi_host->n_interpolators = (int) this->dens.count() / this->kSpaceTraj.count();
+
   gi_host->imgDims.x = imgDims.width;
   gi_host->imgDims.y = imgDims.height;
   gi_host->imgDims.z = imgDims.depth;

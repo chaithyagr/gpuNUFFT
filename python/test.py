@@ -10,13 +10,12 @@ from gpuNUFFT import NUFFTOp
 import time
 
 
-def get_nufft_op(kspace_loc, img_size, n_coils, n_interpolators):
-    sens_maps=None
+def get_nufft_op(kspace_loc, img_size, n_coils, w0):
     return NUFFTOp(
         np.reshape(kspace_loc, kspace_loc.shape[::-1], order='F'),
         img_size,
         n_coils,
-        sens_maps,
+        w0,
         weights,
         3,
         8,
@@ -51,13 +50,13 @@ def setUp():
     # COIL MAPS
     n_coils = 42
     coil_maps = ((1 / (x**2 + y**2 + z**2 + 1))).astype(np.complex64)
-    smaps = np.tile(coil_maps, (n_coils, 1, 1, 1))
+    smaps = np.tile(coil_maps, (num_interpolators, 1, 1, 1))
     multi_img = np.tile(img, (n_coils, 1, 1, 1))
-    return kspace_loc, multi_img, weights
+    return kspace_loc, multi_img, weights, smaps
 
 print('Apply forward op')
-kspace_loc, multi_img, weights = setUp()
-operator = get_nufft_op(kspace_loc, multi_img.shape[1:], multi_img.shape[0], weights.shape[0])
+kspace_loc, multi_img, weights, w0 = setUp()
+operator = get_nufft_op(kspace_loc, multi_img.shape[1:], multi_img.shape[0], w0)
 x = operator.op(np.asarray(
     [np.reshape(image_ch.T, image_ch.size) for image_ch in multi_img]
 ).T)
