@@ -307,6 +307,7 @@ struct GpuNUFFTInfo
   int sectorsToProcess;
   /**\brief Number of coils processed concurrently */
   int n_coils_cc;
+  int n_interpolators_cc;
 };
 }
 

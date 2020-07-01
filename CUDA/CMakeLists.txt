@@ -122,6 +122,7 @@ ELSE(FERMI_GPU)
     list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_70,code=sm_70)
   endif()
 ENDIF(FERMI_GPU)
+list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_70,code=sm_70 -G)
 
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
   MESSAGE("debug mode")

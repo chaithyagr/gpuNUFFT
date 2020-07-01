@@ -34,10 +34,7 @@ def setUp():
     # IMAGE
     np.random.seed(0)
     img_size = [384, 384, 208]
-    [x, y, z] = np.meshgrid(np.linspace(-1, 1, img_size[0]),
-                            np.linspace(-1, 1, img_size[1]),
-                            np.linspace(-1, 1, img_size[2]))
-    img = (x**2 + y**2 + z**2 < 0.5**2)
+    img = np.random.random(tuple(img_size)) + 1j* np.random.random(tuple(img_size))
     img = img.astype(np.complex64)
 
     # KCOORDS
@@ -49,7 +46,7 @@ def setUp():
 
     # COIL MAPS
     n_coils = 42
-    coil_maps = ((1 / (x**2 + y**2 + z**2 + 1))).astype(np.complex64)
+    coil_maps = np.random.random(tuple(img_size)) + 1j* np.random.random(tuple(img_size))
     smaps = np.tile(coil_maps, (num_interpolators, 1, 1, 1))
     multi_img = np.tile(img, (n_coils, 1, 1, 1))
     return kspace_loc, multi_img, weights, smaps
@@ -82,7 +79,7 @@ plt.imshow(abs(img_adj[1]))
 plt.title('adjoint image')
 plt.show()
 # Test Adjoint property
-x_d = np.vdot(self.multi_img, adj_y)
+x_d = np.vdot(multi_img, adj_y)
 x_ad = np.vdot(x, y)
 np.testing.assert_allclose(x_d, x_ad, rtol=1e-5)
 print('done')

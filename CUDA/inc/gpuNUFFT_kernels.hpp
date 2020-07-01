@@ -343,6 +343,10 @@ void performSensMul(CufftType *imdata_d, DType2 *sens_d,
 void performSensSum(CufftType *imdata_d, CufftType *imdata_sum_d,
                     gpuNUFFT::GpuNUFFTInfo *gi_host);
 
+void performKspaceSum(CufftType* data_d,
+  CufftType* data_sum_d,
+  gpuNUFFT::GpuNUFFTInfo* gi_host);
+
 /** \brief FFT shift the grid data
   *
   * @param gdata_d Grid data

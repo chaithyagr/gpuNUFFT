@@ -117,7 +117,7 @@ __global__ void fftScaleKernel(CufftType* data, DType scaling, int N)
 
   while (t < N) 
   {
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       CufftType data_p = data[t + c*N]; 
       data_p.x = data_p.x * scaling;
@@ -145,7 +145,7 @@ __global__ void sensMulKernel(CufftType* imdata, DType2* sens, int N)
 
   while (t < N) 
   {
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       CufftType data_p = imdata[t + c*N]; 
       imdata[t + c*N].x = data_p.x * sens[t + c*N].x - data_p.y * sens[t + c*N].y; //Re
@@ -155,13 +155,30 @@ __global__ void sensMulKernel(CufftType* imdata, DType2* sens, int N)
   }
 }
 
+
+__global__ void conjSensMulKernel(CufftType* imdata, DType2* sens, int N)
+{
+  int t = threadIdx.x +  blockIdx.x *blockDim.x;
+
+  while (t < N) 
+  {
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
+    {
+      CufftType data_p = imdata[t + c*N]; 
+      imdata[t + c*N].x = data_p.x * sens[t + c*N].x + data_p.y * sens[t + c*N].y; //Re
+      imdata[t + c*N].y = data_p.y * sens[t + c*N].x - data_p.x * sens[t + c*N].y; //Im
+    }
+    t = t+ blockDim.x*gridDim.x;
+  }
+}
+
 __global__ void w0MulKernel(CufftType* res_data, CufftType* imdata, DType2* w0, int N)
 {
   int t = threadIdx.x +  blockIdx.x * blockDim.x;
-  int l = blockIdx.y;
+  int l = threadIdx.y +  blockIdx.y * blockDim.y;
   while (t < N)
   {
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       CufftType data_p = imdata[t + c*N];
       res_data[t + c*N].x += data_p.x * w0[t + l*N].x - data_p.y * w0[t + l*N].y; //Re
@@ -171,17 +188,17 @@ __global__ void w0MulKernel(CufftType* res_data, CufftType* imdata, DType2* w0, 
   }
 
 }
-__global__ void conjSensMulKernel(CufftType* imdata, DType2* sens, int N)
+__global__ void conjw0MulKernel(CufftType* res_data, CufftType* imdata, DType2* w0, int N)
 {
   int t = threadIdx.x +  blockIdx.x *blockDim.x;
-
-  while (t < N) 
+  int l = threadIdx.y +  blockIdx.y * blockDim.y;
+  while (t < N)
   {
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
-      CufftType data_p = imdata[t + c*N]; 
-      imdata[t + c*N].x = data_p.x * sens[t + c*N].x + data_p.y * sens[t + c*N].y; //Re
-      imdata[t + c*N].y = data_p.y * sens[t + c*N].x - data_p.x * sens[t + c*N].y; //Im
+      CufftType data_p = imdata[t + c*N];
+      res_data[t + c*N].x += data_p.x * w0[t + l*N].x + data_p.y * w0[t + l*N].y; //Re
+      res_data[t + c*N].y += data_p.x * w0[t + l*N].y - data_p.y * w0[t + l*N].x; //Im
     }
     t = t+ blockDim.x*gridDim.x;
   }
@@ -204,13 +221,30 @@ void performSensMul(CufftType* imdata_d,
     sensMulKernel<<<grid_dim,block_dim>>>(imdata_d,sens_d,gi_host->im_width_dim);
 }
 
-__global__ void sensSumKernel(CufftType* imdata, DType2* imdata_sum, int N)
+void performW0Mul(CufftType* imdata_d,
+  DType2* W0,
+  gpuNUFFT::GpuNUFFTInfo* gi_host,
+  bool conjugate)
+{
+  if (DEBUG)
+    printf("perform W0 multiplication \n");
+
+  dim3 grid_dim(getOptimalGridDim(gi_host->im_width_dim,THREAD_BLOCK_SIZE));
+  //dim3 block_dim(THREAD_BLOCK_SIZE);
+  dim3 block_dim(64, 1, 8);
+  if (conjugate)
+    conjSensMulKernel<<<grid_dim,block_dim>>>(imdata_d, W0,gi_host->im_width_dim);
+  else
+    sensMulKernel<<<grid_dim,block_dim>>>(imdata_d, W0,gi_host->im_width_dim);
+}
+
+__global__ void sensSumKernel(CufftType* imdata, DType2* imdata_sum, int N, int n_cc)
 {
   int t = threadIdx.x +  blockIdx.x *blockDim.x;
 
   while (t < N) 
   {
-    for (int c = 0; c < GI.n_coils_cc; c ++)
+    for (int c = 0; c < n_cc; c ++)
     {
       CufftType data_p = imdata[t + c*N]; 
       imdata_sum[t].x += data_p.x; // Re
@@ -230,7 +264,19 @@ void performSensSum(CufftType* imdata_d,
   dim3 grid_dim(getOptimalGridDim(gi_host->im_width_dim,THREAD_BLOCK_SIZE));
   dim3 block_dim(THREAD_BLOCK_SIZE);
 
-  sensSumKernel<<<grid_dim,block_dim>>>(imdata_d,imdata_sum_d,gi_host->im_width_dim);
+  sensSumKernel<<<grid_dim,block_dim>>>(imdata_d,imdata_sum_d,gi_host->im_width_dim, gi_host->n_coils_cc);
+}
+
+void performKspaceSum(CufftType* data_d,
+  CufftType* data_sum_d,
+  gpuNUFFT::GpuNUFFTInfo* gi_host)
+{
+  if (DEBUG)
+    printf("perform sens coil summation\n");
+
+  dim3 grid_dim(getOptimalGridDim(gi_host->data_count,THREAD_BLOCK_SIZE));
+  dim3 block_dim(THREAD_BLOCK_SIZE);
+  sensSumKernel<<<grid_dim,block_dim>>>(data_d,data_sum_d,gi_host->data_count, gi_host->n_interpolators_cc);
 }
 
 __global__ void densityCompensationKernel(DType2* data, DType* density_comp, int N)
@@ -238,7 +284,7 @@ __global__ void densityCompensationKernel(DType2* data, DType* density_comp, int
   int t = threadIdx.x +  blockIdx.x *blockDim.x;
   while (t < N)
   {
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc * GI.n_interpolators_cc; c+= blockDim.z)
     {
       DType2 data_p = data[t + c*N]; 
       data_p.x = data_p.x * density_comp[t];
@@ -270,7 +316,7 @@ __global__ void deapodizationKernel(CufftType* gdata, DType beta, DType norm_val
     //check if deapodization value is valid number
     if (!isnan(deapo))
     {
-      for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+      for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
       {
         CufftType gdata_p = gdata[t + c*N]; 
         gdata_p.x = gdata_p.x / deapo;//Re
@@ -296,7 +342,7 @@ __global__ void deapodizationKernel2D(CufftType* gdata, DType beta, DType norm_v
     //check if deapodization value is valid number
     if (!isnan(deapo))
     {
-      for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+      for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
       {
         CufftType gdata_p = gdata[t + c*N]; 
         gdata_p.x = gdata_p.x / deapo;//Re
@@ -362,7 +408,7 @@ __global__ void cropKernel(CufftType* gdata,CufftType* imdata, IndType3 offset, 
     getCoordsFromIndex(t, &x, &y, &z, GI.imgDims.x,GI.imgDims.y,GI.imgDims.z);
     grid_ind = computeXYZ2Lin(offset.x+x,offset.y+y,offset.z+z,GI.gridDims);
 
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       imdata[t + c*N] = gdata[grid_ind + c*GI.gridDims_count];
     }
@@ -378,7 +424,7 @@ __global__ void cropKernel2D(CufftType* gdata,CufftType* imdata, IndType3 offset
   {
     getCoordsFromIndex2D(t, &x, &y, GI.imgDims.x,GI.imgDims.y);
     grid_ind = computeXY2Lin(offset.x+x,offset.y+y,GI.gridDims);
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       imdata[t + c*N] = gdata[grid_ind + c*GI.gridDims_count];
     }
@@ -399,7 +445,7 @@ __global__ void fftShiftKernel(CufftType* gdata, IndType3 offset, int N)
     z_opp = (z + offset.z) % GI.gridDims.z;
     ind_opp = computeXYZ2Lin(x_opp,y_opp,z_opp,GI.gridDims);
     //swap points
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       CufftType temp = gdata[t + c*GI.gridDims_count];
       gdata[t + c*GI.gridDims_count] = gdata[ind_opp + c*GI.gridDims_count];
@@ -423,7 +469,7 @@ __global__ void fftShiftKernel(CufftType* gdata, CufftType* outdata, IndType3 of
     z_opp = (z + offset.z) % GI.gridDims.z;
     ind_opp = computeXYZ2Lin(x_opp,y_opp,z_opp,GI.gridDims);
 
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       outdata[t + c*GI.gridDims_count] = gdata[ind_opp + c*GI.gridDims_count];
     }
@@ -444,7 +490,7 @@ __global__ void fftShiftKernel2D(CufftType* gdata, CufftType* outdata, IndType3 
     y_opp = (y + offset.y) % GI.gridDims.y;
     ind_opp = computeXY2Lin(x_opp,y_opp,GI.gridDims);
 
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       outdata[t + c*GI.gridDims_count] = gdata[ind_opp + c*GI.gridDims_count];
     }
@@ -511,7 +557,7 @@ __global__ void precomputedDeapodizationKernel(CufftType* imdata, DType* deapo, 
 
   while (t < N) 
   {
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       CufftType data_p = imdata[t + c*N]; 
       data_p.x = data_p.x * deapo[t];
@@ -737,7 +783,7 @@ __global__ void paddingKernel2D(DType2* imdata,CufftType* gdata, IndType3 offset
     getCoordsFromIndex2D(t, &x, &y,GI.imgDims.x,GI.imgDims.y);
     grid_ind =  computeXY2Lin(offset.x + x,offset.y + y,GI.gridDims);
 
-    for (int c = threadIdx.z; c < GI.n_coils_cc; c+= blockDim.z)
+    for (int c = threadIdx.z; c < GI.n_coils_cc* GI.n_interpolators_cc; c+= blockDim.z)
     {
       gdata[grid_ind + c*GI.gridDims_count].x =  imdata[t + c*N].x;
       gdata[grid_ind + c*GI.gridDims_count].y = imdata[t + c*N].y;

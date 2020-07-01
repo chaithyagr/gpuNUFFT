@@ -50,7 +50,7 @@ void gpuNUFFT::GpuNUFFTOperator::initKernel()
 }
 
 gpuNUFFT::GpuNUFFTInfo *
-gpuNUFFT::GpuNUFFTOperator::initGpuNUFFTInfo(int n_coils_cc)
+gpuNUFFT::GpuNUFFTOperator::initGpuNUFFTInfo(int n_coils_cc, int n_interpolators_cc)
 {
   gpuNUFFT::GpuNUFFTInfo *gi_host =
       (gpuNUFFT::GpuNUFFTInfo *)malloc(sizeof(gpuNUFFT::GpuNUFFTInfo));
@@ -143,13 +143,14 @@ gpuNUFFT::GpuNUFFTOperator::initGpuNUFFTInfo(int n_coils_cc)
   gi_host->is2Dprocessing = this->is2DProcessing();
 
   gi_host->n_coils_cc = n_coils_cc;
+  gi_host->n_interpolators_cc = n_interpolators_cc;
   return gi_host;
 }
 
 gpuNUFFT::GpuNUFFTInfo *
-gpuNUFFT::GpuNUFFTOperator::initAndCopyGpuNUFFTInfo(int n_coils_cc)
+gpuNUFFT::GpuNUFFTOperator::initAndCopyGpuNUFFTInfo(int n_coils_cc, int n_interpolators_cc)
 {
-  GpuNUFFTInfo *gi_host = initGpuNUFFTInfo(n_coils_cc);
+  GpuNUFFTInfo *gi_host = initGpuNUFFTInfo(n_coils_cc, n_interpolators_cc);
 
   gi_host->sectorsToProcess = gi_host->sector_count;
 
@@ -194,7 +195,7 @@ void gpuNUFFT::GpuNUFFTOperator::freeLookupTable()
 {
 }
 
-void gpuNUFFT::GpuNUFFTOperator::initDeviceMemory(int n_coils, int n_coils_cc)
+void gpuNUFFT::GpuNUFFTOperator::initDeviceMemory(int n_coils, int n_coils_cc, int n_interpolators, int n_interpolators_cc)
 {
   if (gpuMemAllocated)
   {
@@ -210,7 +211,7 @@ void gpuNUFFT::GpuNUFFTOperator::initDeviceMemory(int n_coils, int n_coils_cc)
     }
   }
 
-  gi_host = initAndCopyGpuNUFFTInfo(n_coils_cc);
+  gi_host = initAndCopyGpuNUFFTInfo(n_coils_cc, n_interpolators_cc);
   this->allocatedCoils = n_coils_cc;
 
   int data_count = (int)this->kSpaceTraj.count();
@@ -224,13 +225,14 @@ void gpuNUFFT::GpuNUFFTOperator::initDeviceMemory(int n_coils, int n_coils_cc)
                                       dataIndices.count());
 
   if (DEBUG)
-    printf("allocate and copy data of size %d...\n", data_count * n_coils_cc);
-  allocateDeviceMem<DType2>(&data_sorted_d, data_count * n_coils_cc);
+    printf("allocate and copy data of size %d...\n", data_count * n_coils_cc * n_interpolators_cc);
+  allocateDeviceMem<DType2>(&data_sorted_d, data_count * n_coils_cc * n_interpolators_cc);
+  allocateDeviceMem<DType2>(&data_sum_d, data_count * n_coils_cc);
 
   if (DEBUG)
     printf("allocate and copy gdata of size %d...\n",
-           gi_host->grid_width_dim * n_coils_cc);
-  allocateDeviceMem<CufftType>(&gdata_d, gi_host->grid_width_dim * n_coils_cc);
+           gi_host->grid_width_dim * n_coils_cc * n_interpolators_cc);
+  allocateDeviceMem<CufftType>(&gdata_d, gi_host->grid_width_dim * n_coils_cc * n_interpolators_cc);
 
   if (DEBUG)
     printf("allocate and copy coords of size %d...\n",
@@ -263,14 +265,14 @@ void gpuNUFFT::GpuNUFFTOperator::initDeviceMemory(int n_coils, int n_coils_cc)
       printf("allocate and copy density compensation of size %d...\n",
              data_count);
     allocateAndCopyToDeviceMem<DType>(&density_comp_d, this->dens.data,
-                                      data_count);
+                                      data_count * n_interpolators_cc);
   }
 
   if (this->applySensData())
   {
     if (DEBUG)
-      printf("allocate sens data of size %d...\n", imdata_count * n_coils_cc);
-    allocateDeviceMem<DType2>(&sens_d, imdata_count * n_coils_cc);
+      printf("allocate sens data of size %d...\n", imdata_count * n_interpolators_cc);
+    allocateDeviceMem<DType2>(&sens_d, imdata_count * n_interpolators_cc);
   }
 
   // copy deapo function to device
@@ -1082,6 +1084,7 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
 
   int data_count = (int)this->kSpaceTraj.count();
   int n_coils = (int)kspaceData.dim.channels;
+  int n_interpolators = (int)this->dens.count() / data_count;
   IndType imdata_count = this->imgDims.count();
 
   int n_coils_cc = this->is2DProcessing()
@@ -1100,131 +1103,132 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
   if (DEBUG)
     printf("allocate and copy imdata of size %d...\n",
            imdata_count * n_coils_cc);
-  allocateDeviceMem<DType2>(&imdata_d, imdata_count * n_coils_cc);
+  allocateDeviceMem<DType2>(&imdata_d, imdata_count * n_coils_cc * n_interpolators_cc);
 
   if (DEBUG)
     printf("allocate and copy data of size %d...\n", data_count * n_coils_cc);
-  allocateDeviceMem<CufftType>(&data_d, data_count * n_coils_cc);
+  allocateDeviceMem<CufftType>(&data_d, data_count * n_coils_cc * n_interpolators_cc);
 
   // cuda mem allocation
-  initDeviceMemory(n_coils, n_coils_cc);
+  initDeviceMemory(n_coils, n_coils_cc, n_interpolators, n_interpolators_cc);
 
   if (debugTiming)
     printf("Memory allocation: %.2f ms\n", stopTiming());
 
   int err;
-
   // iterate over coils and compute result
   for (int coil_it = 0; coil_it < n_coils; coil_it += n_coils_cc)
   {
-    int data_coil_offset = coil_it * data_count;
-    int im_coil_offset = coil_it * (int)imdata_count;
-
-    this->updateConcurrentCoilCount(coil_it, n_coils, n_coils_cc);
-
-    if (this->applySensData())
-      // perform automatically "repeating" of input image in case
-      // of existing sensitivity data
-      for (int cnt = 0; cnt < n_coils_cc; cnt++)
-        copyToDevice<DType2>(imgData.data, imdata_d + cnt * imdata_count,
-                             imdata_count);
-    else
-      copyToDevice<DType2>(imgData.data + im_coil_offset, imdata_d,
-                           imdata_count * n_coils_cc);
-
-    // reset temp arrays
-    cudaMemset(gdata_d, 0,
-               sizeof(CufftType) * gi_host->grid_width_dim * n_coils_cc);
-    cudaMemset(data_d, 0, sizeof(CufftType) * data_count * n_coils_cc);
-
-    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
-      printf("error at thread synchronization 1: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-
-    if (this->applySensData())
+    int data_coil_offset = coil_it * data_count ;
+    cudaMemset(data_sum_d, 0, sizeof(CufftType) * data_count * n_coils_cc);
+    for(int inter_it = 0; inter_it< n_interpolators; inter_it+= n_interpolators_cc)
     {
-      copyToDevice(this->sens.data + im_coil_offset, sens_d,
-                   imdata_count * n_coils_cc);
-      performSensMul(imdata_d, sens_d, gi_host, false);
-    }
+        printf("Coil %d :: Interpolator %d\n", coil_it, inter_it);
+        int im_coil_offset = coil_it * (int)imdata_count;
+        int n_interpolator_offset = inter_it * data_count;
+        this->updateConcurrentCoilCount(coil_it, n_coils, n_coils_cc);
 
-    // apodization Correction
-    performForwardDeapodization(imdata_d, deapo_d, gi_host);
-	  
-    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
-      printf("error at thread synchronization 2: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-    // resize by oversampling factor and zero pad
-    performPadding(imdata_d, gdata_d, gi_host);
+        if (this->applySensData())
+          // perform automatically "repeating" of input image in case
+          // of existing sensitivity data
+          for (int cnt = 0; cnt < n_interpolators_cc; cnt++)
+            copyToDevice<DType2>(imgData.data + im_coil_offset, imdata_d + cnt * imdata_count,
+                                 imdata_count);
+        else
+            copyToDevice<DType2>(imgData.data + im_coil_offset, imdata_d,
+                               imdata_count * n_coils_cc);
 
-    if (debugTiming)
-      startTiming();
+        // reset temp arrays
+        cudaMemset(gdata_d, 0,
+                   sizeof(CufftType) * gi_host->grid_width_dim * n_coils_cc * n_interpolators_cc);
+        cudaMemset(data_d, 0, sizeof(CufftType) * data_count * n_coils_cc * n_interpolators_cc);
+        if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
+          printf("error at thread synchronization 1: %s\n",
+                 cudaGetErrorString(cudaGetLastError()));
 
-    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
-      printf("error at thread synchronization 3: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-    // shift image to get correct zero frequency position
-    performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
+        if (this->applySensData())
+        {
+          copyToDevice(this->sens.data + im_coil_offset, sens_d,
+                       imdata_count * n_interpolators_cc);
+          performSensMul(imdata_d, sens_d, gi_host, false);
+        }
 
-    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
-      printf("error at thread synchronization 4: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-    // eventually free imdata_d
-    // Forward FFT to kspace domain
-    int c = 0;
-    while (c < n_coils_cc)
-    {
-      if ((err = pt2CufftExec(fft_plan, gdata_d + c * gi_host->gridDims_count,
-                              gdata_d + c * gi_host->gridDims_count,
-                              CUFFT_FORWARD)) != CUFFT_SUCCESS)
-      {
-        fprintf(stderr, "cufft has failed with err %i \n", err);
-        showMemoryInfo(true, stderr);
-      }
-      c++;
-    }
+        // apodization Correction
+        performForwardDeapodization(imdata_d, deapo_d, gi_host);
 
-    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
-      printf("error at thread synchronization 5: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
-    performFFTShift(gdata_d, FORWARD, getGridDims(), gi_host);
+        if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
+          printf("error at thread synchronization 2: %s\n",
+                 cudaGetErrorString(cudaGetLastError()));
+        // resize by oversampling factor and zero pad
+        performPadding(imdata_d, gdata_d, gi_host);
+        if (debugTiming)
+          startTiming();
 
-    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
-      printf("error at thread synchronization 6: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
+        if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
+          printf("error at thread synchronization 3: %s\n",
+                 cudaGetErrorString(cudaGetLastError()));
+        // shift image to get correct zero frequency position
+        performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
+        if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
+          printf("error at thread synchronization 4: %s\n",
+                 cudaGetErrorString(cudaGetLastError()));
+        // eventually free imdata_d
+        // Forward FFT to kspace domain
+        int c = 0;
+        while (c < n_coils_cc * n_interpolators_cc)
+        {
+          if ((err = pt2CufftExec(fft_plan, gdata_d + c * gi_host->gridDims_count,
+                                  gdata_d + c * gi_host->gridDims_count,
+                                  CUFFT_FORWARD)) != CUFFT_SUCCESS)
+          {
+            fprintf(stderr, "cufft has failed with err %i \n", err);
+            showMemoryInfo(true, stderr);
+          }
+          c++;
+        }
 
-    if (debugTiming)
-      printf("FFT (incl. shift): %.2f ms\n", stopTiming());
+        if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
+          printf("error at thread synchronization 5: %s\n",
+                 cudaGetErrorString(cudaGetLastError()));
+        performFFTShift(gdata_d, FORWARD, getGridDims(), gi_host);
 
-    if (debugTiming)
-      startTiming();
+        if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
+          printf("error at thread synchronization 6: %s\n",
+                 cudaGetErrorString(cudaGetLastError()));
 
-    // convolution and resampling to non-standard trajectory
-    forwardConvolution(data_d, crds_d, gdata_d, NULL, sectors_d,
-                       sector_centers_d, gi_host);
-    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
-      printf("error at thread synchronization 7: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
+        if (debugTiming)
+          printf("FFT (incl. shift): %.2f ms\n", stopTiming());
 
-    if (debugTiming)
-      printf("Forward Convolution: %.2f ms\n", stopTiming());
+        if (debugTiming)
+          startTiming();
 
-    performFFTScaling(data_d, gi_host->data_count, gi_host);
-    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
-      printf("error: at thread synchronization 8: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
+        // convolution and resampling to non-standard trajectory
+        forwardConvolution(data_d, crds_d, gdata_d, NULL, sectors_d,
+                           sector_centers_d, gi_host);
+        if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
+          printf("error at thread synchronization 7: %s\n",
+                 cudaGetErrorString(cudaGetLastError()));
 
-    // Also apply density compensation here
-    if (this->applyDensComp())
-      performDensityCompensation(data_d, density_comp_d, gi_host);
+        if (debugTiming)
+          printf("Forward Convolution: %.2f ms\n", stopTiming());
 
-    // write result in correct order back into output array
-    writeOrderedGPU(data_sorted_d, data_indices_d, data_d,
-                    (int)this->kSpaceTraj.count(), n_coils_cc);
-    
-    copyFromDevice(data_sorted_d, kspaceData.data + data_coil_offset,
-                   data_count * n_coils_cc);
-  }  // iterate over coils
+        performFFTScaling(data_d, gi_host->data_count, gi_host);
+        if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
+          printf("error: at thread synchronization 8: %s\n",
+                 cudaGetErrorString(cudaGetLastError()));
+
+        // Also apply density compensation here
+        if (this->applyDensComp())
+          performDensityCompensation(data_d, density_comp_d, gi_host);
+
+        // write result in correct order back into output array
+        writeOrderedGPU(data_sorted_d, data_indices_d, data_d,
+                        (int)this->kSpaceTraj.count(), n_coils_cc * n_interpolators_cc);
+        performKspaceSum(data_sorted_d, data_sum_d, gi_host);
+     }  //iteratre over interpolators
+     copyFromDevice(data_sum_d, kspaceData.data + data_coil_offset,
+                       data_count * n_coils_cc * n_interpolators_cc);
+  }      // iterate over coils
 
   freeTotalDeviceMemory(data_d, imdata_d, NULL);
 

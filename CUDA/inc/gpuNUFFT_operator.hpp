@@ -460,14 +460,14 @@ class GpuNUFFTOperator
     *
     * @see gpuNUFFT::GpuNUFFTInfo
     */
-  GpuNUFFTInfo *initGpuNUFFTInfo(int n_coils_cc = 1);
+  GpuNUFFTInfo *initGpuNUFFTInfo(int n_coils_cc = 1, int n_interpolators_cc = 1);
 
   /** \brief Virtual method to perform precomputation of all neccessary meta
   *information used in the gridding steps.
   *
   * @see gpuNUFFT::GpuNUFFTInfo
   */
-  virtual GpuNUFFTInfo *initAndCopyGpuNUFFTInfo(int n_coils_cc = 1);
+  virtual GpuNUFFTInfo *initAndCopyGpuNUFFTInfo(int n_coils_cc = 1, int n_interpolators_cc = 1);
 
   /** \brief Virtual adjoint convolution call, which can be used by sub-classes
    *to add behaviour to the gridding steps
@@ -531,6 +531,8 @@ class GpuNUFFTOperator
   IndType *data_indices_d;
   /** \brief GPU Device pointer to sorted data array elements. */
   DType2 *data_sorted_d;
+  /** \brief GPU Device pointer to sumed data array elements. */
+  DType2 *data_sum_d;
 
   int allocatedCoils;
 
@@ -547,7 +549,7 @@ class GpuNUFFTOperator
 
   /** \brief Function to allocate all neccessary device memory used by the
    * GriddingOperator. */
-  void initDeviceMemory(int n_coils, int n_coils_cc = 1);
+  void initDeviceMemory(int n_coils, int n_coils_cc = 1, int n_interpolators=1, int n_interpolators_cc = 1);
 
   /** \brief Function to free the neccessary device memory used by the
    * GriddingOperator. */
