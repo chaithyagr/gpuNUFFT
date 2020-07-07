@@ -143,7 +143,7 @@ class GpuNUFFTPythonOperator
             myDims = myDims * gpuNUFFTOp->getOsf();
         int depth = myDims.depth;
         if(dimension==2)
-            myDims.depth = 1;
+            depth = 1;
         py::array_t<std::complex<DType>> out_result;
         if(has_sense_data == false)
             out_result.resize({n_coils, depth, (int)myDims.height, (int)myDims.width});
