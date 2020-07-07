@@ -107,7 +107,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="gpuNUFFT",
-    package_dir={"": "CUDA/bin"},
+    version="0.1.1a1",
     ext_modules=[
         CMakeExtension("gpuNUFFT", sourcedir=os.path.join("CUDA")),
     ],
