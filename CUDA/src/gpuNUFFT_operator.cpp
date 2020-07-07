@@ -1011,10 +1011,6 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
       printf("error: at thread synchronization 8: %s\n",
              cudaGetErrorString(cudaGetLastError()));
     
-    // Also apply density compensation here
-    if (this->applyDensComp())
-      performDensityCompensation(data_d, density_comp_d, gi_host);
-
     // write result in correct order back into output array
     writeOrderedGPU(data_sorted_d, data_indices_d, data_d,
                     (int)this->kSpaceTraj.count(), n_coils_cc);
@@ -1219,10 +1215,6 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
       printf("error: at thread synchronization 8: %s\n",
              cudaGetErrorString(cudaGetLastError()));
-
-    // Also apply density compensation here
-    if (this->applyDensComp())
-      performDensityCompensation(data_d, density_comp_d, gi_host);
 
     // write result in correct order back into output array
     writeOrderedGPU(data_sorted_d, data_indices_d, data_d,
