@@ -227,8 +227,8 @@ class GpuNUFFTPythonOperator
 PYBIND11_MODULE(gpuNUFFT, m) {
     py::class_<GpuNUFFTPythonOperator>(m, "NUFFTOp")
         .def(py::init<py::array_t<DType>, py::array_t<int>, int, py::array_t<std::complex<DType>>, py::array_t<float>, int, int, int, bool>(), py::call_guard<py::gil_scoped_release>())
-        .def("op", &GpuNUFFTPythonOperator::op)
-        .def("adj_op",  &GpuNUFFTPythonOperator::adj_op)
+        .def("op", &GpuNUFFTPythonOperator::op, py::call_guard<py::gil_scoped_release>())
+        .def("adj_op",  &GpuNUFFTPythonOperator::adj_op, py::call_guard<py::gil_scoped_release>())
         .def("clean_memory", &GpuNUFFTPythonOperator::clean_memory)
         .def("set_smaps", &GpuNUFFTPythonOperator::set_smaps);
 }
