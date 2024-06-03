@@ -53,13 +53,13 @@ class GpuNUFFTOperator
   GpuNUFFTOperator(IndType kernelWidth, IndType sectorWidth, DType osf,
                    Dimensions imgDims, bool loadKernel = true,
                    OperatorType operatorType = DEFAULT,
-                   bool matlabSharedMem = false)
+                   bool matlabSharedMem = false, bool grad_mode = false)
     : operatorType(operatorType), osf(osf), kernelWidth(kernelWidth),
       sectorWidth(sectorWidth), imgDims(imgDims), gpuMemAllocated(false),
       debugTiming(DEBUG), sens_d(NULL), crds_d(NULL), density_comp_d(NULL),
       deapo_d(NULL), gdata_d(NULL), sector_centers_d(NULL), sectors_d(NULL),
       data_indices_d(NULL), data_sorted_d(NULL), allocatedCoils(0),
-      matlabSharedMem(matlabSharedMem)
+      matlabSharedMem(matlabSharedMem), grad_mode(grad_mode)
   {
     if (loadKernel)
       initKernel();
@@ -342,6 +342,14 @@ class GpuNUFFTOperator
                                           GpuNUFFTOutput gpuNUFFTOut);
 
   void clean_memory();
+
+  void setGradMode(bool grad_mode) {
+    this->grad_mode = grad_mode;
+  }
+
+  bool getGradMode() {
+    return this->grad_mode;
+  }
   /** \brief Check if density compensation data is available. */
   bool applyDensComp()
   {
@@ -451,6 +459,10 @@ class GpuNUFFTOperator
   /** \brief Flag which indicates if data pointers are allocated with Matlab 
   */
   bool matlabSharedMem;
+
+  /** \brief Flag for changing the isign, mainly used for gradients 
+  */
+  bool grad_mode;
 
   /** \brief Return Grid Width (ImageWidth * osf) */
   IndType getGridWidth()

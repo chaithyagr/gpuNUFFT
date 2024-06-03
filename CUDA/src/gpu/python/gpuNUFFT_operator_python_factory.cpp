@@ -291,6 +291,12 @@ class GpuNUFFTPythonOperator
        gpuNUFFTOp->clean_memory();
     }
 
+    void toggle_grad_mode()
+    {
+        bool current_mode = gpuNUFFTOp->getGradMode();
+        gpuNUFFTOp->setGradMode(!current_mode);
+    }
+
     void set_smaps(py::array_t<std::complex<DType>> sense_maps)
     {
         CAST_POINTER_VARNAME(sense_maps, sensArray);
@@ -436,6 +442,7 @@ PYBIND11_MODULE(gpuNUFFT, m) {
         .def("clean_memory", &GpuNUFFTPythonOperator::clean_memory)
         .def("estimate_density_comp", &GpuNUFFTPythonOperator::estimate_density_comp, py::arg("max_iter") = 10)
         .def("set_smaps", &GpuNUFFTPythonOperator::set_smaps)
+        .def("toggle_grad_mode", &GpuNUFFTPythonOperator::toggle_grad_mode)
         .def("get_spectral_radius", &GpuNUFFTPythonOperator::get_spectral_radius, py::arg("max_iter") = 20, py::arg("tolerance") = 1e-6);
 }
 #endif  // GPUNUFFT_OPERATOR_PYTHONFACTORY_H_INCLUDED
