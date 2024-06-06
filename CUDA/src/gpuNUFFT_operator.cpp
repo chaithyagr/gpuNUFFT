@@ -1026,7 +1026,7 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     {
       if ((err = pt2CufftExec(fft_plan, gdata_d + c * gi_host->gridDims_count,
                               gdata_d + c * gi_host->gridDims_count,
-                              CUFFT_FORWARD)) != CUFFT_SUCCESS)
+                              grad_mode?CUFFT_INVERSE:CUFFT_FORWARD)) != CUFFT_SUCCESS)
       {
         fprintf(stderr, "cufft has failed with err %i \n", err);
         showMemoryInfo(true, stderr);
@@ -1037,7 +1037,7 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 5: %s\n",
              cudaGetErrorString(cudaGetLastError()));
-    performFFTShift(gdata_d, FORWARD, getGridDims(), gi_host);
+    performFFTShift(gdata_d, grad_mode?INVERSE:FORWARD, getGridDims(), gi_host);
 
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 6: %s\n",
@@ -1240,7 +1240,7 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     {
       if ((err = pt2CufftExec(fft_plan, gdata_d + c * gi_host->gridDims_count,
                               gdata_d + c * gi_host->gridDims_count,
-                              CUFFT_FORWARD)) != CUFFT_SUCCESS)
+                              grad_mode?CUFFT_INVERSE:CUFFT_FORWARD)) != CUFFT_SUCCESS)
       {
         fprintf(stderr, "cufft has failed with err %i \n", err);
         showMemoryInfo(true, stderr);
@@ -1251,7 +1251,7 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 5: %s\n",
              cudaGetErrorString(cudaGetLastError()));
-    performFFTShift(gdata_d, FORWARD, getGridDims(), gi_host);
+    performFFTShift(gdata_d, grad_mode?INVERSE:FORWARD, getGridDims(), gi_host);
 
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 6: %s\n",
