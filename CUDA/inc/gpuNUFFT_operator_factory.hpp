@@ -174,6 +174,15 @@ class GpuNUFFTOperatorFactory
   void setUseTextures(bool useTextures);
 
   void setBalanceWorkload(bool balanceWorkload);
+  
+  /**
+  * \brief Set k-space locations and corresponding density. This can also be used 
+  * to update them
+  * 
+  */
+  void set_pts(
+    gpuNUFFT::GpuNUFFTOperator *gpuNUFFTOp, gpuNUFFT::Array<DType> &kSpaceTraj,
+    gpuNUFFT::Array<DType> &densCompData);
 
  protected:
   template<typename T>
@@ -315,7 +324,9 @@ class GpuNUFFTOperatorFactory
   */
   gpuNUFFT::Array<DType> computeDeapodizationFunction(const IndType &kernelWidth,
     const DType &osf, gpuNUFFT::Dimensions &imgDims);
+  
 
+ 
  private:
   /** \brief Flag to indicate texture interpolation */
   bool useTextures;

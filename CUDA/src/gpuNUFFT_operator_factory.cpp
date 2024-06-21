@@ -457,10 +457,6 @@ gpuNUFFT::GpuNUFFTOperatorFactory::createGpuNUFFTOperator(
   checkMemoryConsumption(kSpaceTraj.dim, sectorWidth, osf, imgDims,
                          densCompData.dim, sensData.dim);
 
-  if (kSpaceTraj.dim.channels > 1)
-    throw std::invalid_argument(
-        "Trajectory dimension must not contain a channel size greater than 1!");
-
   if (imgDims.channels > 1)
     throw std::invalid_argument(
         "Image dimensions must not contain a channel size greater than 1!");
@@ -469,6 +465,29 @@ gpuNUFFT::GpuNUFFTOperatorFactory::createGpuNUFFTOperator(
 
   gpuNUFFT::GpuNUFFTOperator *gpuNUFFTOp =
       createNewGpuNUFFTOperator(kernelWidth, sectorWidth, osf, imgDims);
+
+  // Set points and density compensation
+  set_pts(gpuNUFFTOp, kSpaceTraj, densCompData);
+  
+  if (sensData.data != NULL)
+    gpuNUFFTOp->setSens(sensData);
+  
+  gpuNUFFTOp->setDeapodizationFunction(
+    this->computeDeapodizationFunction(kernelWidth, osf, imgDims));
+    
+  debug("finished creation of gpuNUFFT operator\n");
+  
+  return gpuNUFFTOp;
+}
+
+
+void gpuNUFFT::GpuNUFFTOperatorFactory::set_pts(
+    gpuNUFFT::GpuNUFFTOperator *gpuNUFFTOp, gpuNUFFT::Array<DType> &kSpaceTraj,
+    gpuNUFFT::Array<DType> &densCompData)
+{
+  if (kSpaceTraj.dim.channels > 1)
+    throw std::invalid_argument(
+        "Trajectory dimension must not contain a channel size greater than 1!");
 
   // assign according sector to k-Space position
   gpuNUFFT::Array<IndType> assignedSectors =
@@ -486,9 +505,6 @@ gpuNUFFT::GpuNUFFTOperatorFactory::createGpuNUFFTOperator(
   Array<DType> densData;
   if (densCompData.data != NULL)
     densData = initDensData(gpuNUFFTOp, coordCnt);
-
-  if (sensData.data != NULL)
-    gpuNUFFTOp->setSens(sensData);
 
   if (useGpu)
   {
@@ -543,13 +559,6 @@ gpuNUFFT::GpuNUFFTOperatorFactory::createGpuNUFFTOperator(
   // free temporary array
   free(assignedSectors.data);
   assignedSectors.data = NULL;
-
-  gpuNUFFTOp->setDeapodizationFunction(
-    this->computeDeapodizationFunction(kernelWidth, osf, imgDims));
-    
-  debug("finished creation of gpuNUFFT operator\n");
-  
-  return gpuNUFFTOp;
 }
 
 gpuNUFFT::GpuNUFFTOperator *
