@@ -304,6 +304,21 @@ class GpuNUFFTPythonOperator
         gpuNUFFTOp->setSens(sensArray);
     }
 
+    void set_pts(py::array_t<DType> kspace_loc, py::array_t<DType> density_comp)
+    {
+        gpuNUFFT::Array<DType> kSpaceTraj = readNumpyArray(kspace_loc);
+        kSpaceTraj.dim.length = trajectory_length;
+
+        // density compensation weights
+        gpuNUFFT::Array<DType> density_compArray;
+        if(density_comp != Py_None)
+        {
+            density_compArray = readNumpyArray(density_comp);
+            density_compArray.dim.length = trajectory_length;
+        }
+        factory.set_pts(gpuNUFFTOp, kSpaceTraj, density_compArray);
+
+    }
     py::array_t<DType> estimate_density_comp(int max_iter = 10)
     {
         IndType n_samples = kspace_data.count();
@@ -443,6 +458,7 @@ PYBIND11_MODULE(gpuNUFFT, m) {
         .def("estimate_density_comp", &GpuNUFFTPythonOperator::estimate_density_comp, py::arg("max_iter") = 10)
         .def("set_smaps", &GpuNUFFTPythonOperator::set_smaps)
         .def("toggle_grad_mode", &GpuNUFFTPythonOperator::toggle_grad_mode)
-        .def("get_spectral_radius", &GpuNUFFTPythonOperator::get_spectral_radius, py::arg("max_iter") = 20, py::arg("tolerance") = 1e-6);
+        .def("get_spectral_radius", &GpuNUFFTPythonOperator::get_spectral_radius, py::arg("max_iter") = 20, py::arg("tolerance") = 1e-6)
+        .def("set_pts", &GpuNUFFTPythonOperator::set_pts, py::arg("kspace_loc"), py::arg("density_comp") = py::none());
 }
 #endif  // GPUNUFFT_OPERATOR_PYTHONFACTORY_H_INCLUDED
