@@ -1076,6 +1076,8 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     old_stream = new_stream;
   }  // iterate over coils
 
+  cudaStreamSynchronize(old_stream);
+  cudaStreamDestroy(old_stream);
   freeTotalDeviceMemory(imdata_d, NULL);
   this->freeDeviceMemory();
 
@@ -1291,13 +1293,14 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     old_stream = new_stream;
   }  // iterate over coils
 
+  cudaStreamSynchronize(old_stream);
+  cudaStreamDestroy(old_stream);
   freeTotalDeviceMemory(data_d, imdata_d, NULL);
   this->freeDeviceMemory();
 
   if ((cudaDeviceSynchronize() != cudaSuccess))
     fprintf(stderr, "error in performForwardGpuNUFFT function: %s\n",
             cudaGetErrorString(cudaGetLastError()));
-  cudaStreamDestroy(old_stream);
 }
 
 gpuNUFFT::Array<CufftType>
