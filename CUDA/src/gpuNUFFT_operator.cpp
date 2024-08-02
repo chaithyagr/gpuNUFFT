@@ -287,11 +287,11 @@ void gpuNUFFT::GpuNUFFTOperator::initDeviceMemory(int n_coils, int n_coils_cc)
     printf("creating cufft plan with %d,%d,%d dimensions\n",
            DEFAULT_VALUE(gi_host->gridDims.z), gi_host->gridDims.y,
            gi_host->gridDims.x);
-  cufftResult res = cufftPlan3d(
-      &fft_plan, (int)DEFAULT_VALUE(gi_host->gridDims.z),
-      (int)gi_host->gridDims.y, (int)gi_host->gridDims.x, CufftTransformType);
-  if (res != CUFFT_SUCCESS)
-    fprintf(stderr, "error on CUFFT Plan creation!!! %d\n", res);
+  // cufftResult res = cufftPlan3d(
+  //     &fft_plan, (int)DEFAULT_VALUE(gi_host->gridDims.z),
+  //     (int)gi_host->gridDims.y, (int)gi_host->gridDims.x, CufftTransformType);
+  // if (res != CUFFT_SUCCESS)
+  //   fprintf(stderr, "error on CUFFT Plan creation!!! %d\n", res);
   gpuMemAllocated = true;
 }
 
@@ -301,7 +301,9 @@ void gpuNUFFT::GpuNUFFTOperator::freeDeviceMemory()
     return;
 
   cudaFreeHost(gi_host);
-  cufftDestroy(fft_plan);
+  cufftResult res = cufftDestroy(fft_plan);
+  if (res != CUFFT_SUCCESS)
+    fprintf(stderr, "error on CUFFT Plan destruction!!! %d\n", res);
   // Destroy the cuFFT plan.
   if (DEBUG && (cudaDeviceSynchronize() != cudaSuccess))
     printf("error at thread synchronization 9: %s\n",
@@ -312,13 +314,13 @@ void gpuNUFFT::GpuNUFFTOperator::freeDeviceMemory()
                         sectors_d, sector_centers_d, NULL);  // NULL as stop
 
   if (deapo_d != NULL)
-    cudaFree(deapo_d);
+    freeDeviceMem((void *)deapo_d);
 
   if (this->applySensData())
-    cudaFree(sens_d);
+    freeDeviceMem((void *)sens_d);
 
   if (this->applyDensComp())
-    cudaFree(density_comp_d);
+    freeDeviceMem((void *)density_comp_d);
 
   showMemoryInfo();
   gpuMemAllocated = false;
@@ -934,7 +936,7 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
   if (DEBUG)
     printf("allocate and copy imdata of size %d...\n",
            imdata_count * n_coils_cc);
-  allocateDeviceMem<DType2>(&imdata_d, imdata_count * n_coils_cc);
+  //allocateDeviceMem<DType2>(&imdata_d, imdata_count * n_coils_cc);
 
   if (debugTiming)
     printf("Memory allocation: %.2f ms\n", stopTiming());
@@ -948,9 +950,9 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     unsigned long int data_coil_offset = (long int)coil_it * data_count;
     unsigned long int im_coil_offset = coil_it * (long int)imdata_count;
 
-    data_d = kspaceData_gpu.data + data_coil_offset;
+    //data_d = kspaceData_gpu.data + data_coil_offset;
 
-    this->updateConcurrentCoilCount(coil_it, n_coils, n_coils_cc);
+//    this->updateConcurrentCoilCount(coil_it, n_coils, n_coils_cc);
 
     if (this->applySensData())
       // perform automatically "repeating" of input image in case
@@ -959,13 +961,13 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
         copyDeviceToDeviceAsync<DType2>(imgData_gpu.data,
                                    imdata_d + cnt * imdata_count, imdata_count, new_stream);
     else
-      copyDeviceToDeviceAsync<DType2>(imgData_gpu.data + im_coil_offset, imdata_d,
-                                 imdata_count * n_coils_cc, new_stream);
+//      copyDeviceToDeviceAsync<DType2>(imgData_gpu.data + im_coil_offset, imdata_d,
+  //                               imdata_count * n_coils_cc, new_stream);
 
     // reset temp arrays
-    cudaMemsetAsync(gdata_d, 0,
-               sizeof(CufftType) * gi_host->grid_width_dim * n_coils_cc, new_stream);
-    cudaMemsetAsync(data_d, 0, sizeof(CufftType) * data_count * n_coils_cc, new_stream);
+//    cudaMemsetAsync(gdata_d, 0,
+  //             sizeof(CufftType) * gi_host->grid_width_dim * n_coils_cc, new_stream);
+    //cudaMemsetAsync(data_d, 0, sizeof(CufftType) * data_count * n_coils_cc, new_stream);
 
     if (DEBUG && (cudaStreamSynchronize(new_stream)!= cudaSuccess))
       printf("error at thread synchronization 1: %s\n",
@@ -1000,12 +1002,12 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
         return;
     } 
     // apodization Correction
-    performForwardDeapodization(imdata_d, deapo_d, gi_host);
+    //performForwardDeapodization(imdata_d, deapo_d, gi_host);
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 2: %s\n",
              cudaGetErrorString(cudaGetLastError()));
     // resize by oversampling factor and zero pad
-    performPadding(imdata_d, gdata_d, gi_host);
+    //performPadding(imdata_d, gdata_d, gi_host);
 
     if (debugTiming)
       startTiming();
@@ -1014,7 +1016,7 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
       printf("error at thread synchronization 3: %s\n",
              cudaGetErrorString(cudaGetLastError()));
     // shift image to get correct zero frequency position
-    performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
+    //performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
 
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 4: %s\n",
@@ -1024,9 +1026,9 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     int c = 0;
     while (c < n_coils_cc)
     {
-      if ((err = pt2CufftExec(fft_plan, gdata_d + c * gi_host->gridDims_count,
-                              gdata_d + c * gi_host->gridDims_count,
-                              grad_mode?CUFFT_INVERSE:CUFFT_FORWARD)) != CUFFT_SUCCESS)
+     // if ((err = pt2CufftExec(fft_plan, gdata_d + c * gi_host->gridDims_count,
+       //                       gdata_d + c * gi_host->gridDims_count,
+         //                     grad_mode?CUFFT_INVERSE:CUFFT_FORWARD)) != CUFFT_SUCCESS)
       {
         fprintf(stderr, "cufft has failed with err %i \n", err);
         showMemoryInfo(true, stderr);
@@ -1037,7 +1039,7 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 5: %s\n",
              cudaGetErrorString(cudaGetLastError()));
-    performFFTShift(gdata_d, grad_mode?INVERSE:FORWARD, getGridDims(), gi_host);
+    //performFFTShift(gdata_d, grad_mode?INVERSE:FORWARD, getGridDims(), gi_host);
 
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 6: %s\n",
@@ -1050,8 +1052,8 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
       startTiming();
 
     // convolution and resampling to non-standard trajectory
-    forwardConvolution(data_d, crds_d, gdata_d, NULL, sectors_d,
-                       sector_centers_d, gi_host);
+    //forwardConvolution(data_d, crds_d, gdata_d, NULL, sectors_d,
+     //                  sector_centers_d, gi_host);
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 7: %s\n",
              cudaGetErrorString(cudaGetLastError()));
@@ -1059,28 +1061,27 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     if (debugTiming)
       printf("Forward Convolution: %.2f ms\n", stopTiming());
 
-    performFFTScaling(data_d, gi_host->data_count, gi_host);
+   // performFFTScaling(data_d, gi_host->data_count, gi_host);
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error: at thread synchronization 8: %s\n",
              cudaGetErrorString(cudaGetLastError()));
     
     // write result in correct order back into output array
-    writeOrderedGPU(data_sorted_d, data_indices_d, data_d,
-                    (int)this->kSpaceTraj.count(), n_coils_cc);
+  //  writeOrderedGPU(data_sorted_d, data_indices_d, data_d,
+    //                (int)this->kSpaceTraj.count(), n_coils_cc);
     if(coil_it > 1)
     {
       cudaStreamSynchronize(old_stream);
       cudaStreamDestroy(old_stream);
     }
-    copyDeviceToDeviceAsync(data_sorted_d, data_d, data_count * n_coils_cc, new_stream);
+   // copyDeviceToDeviceAsync(data_sorted_d, data_d, data_count * n_coils_cc, new_stream);
     old_stream = new_stream;
   }  // iterate over coils
 
   cudaStreamSynchronize(old_stream);
   cudaStreamDestroy(old_stream);
-  freeTotalDeviceMemory(imdata_d, NULL);
+ // freeTotalDeviceMemory(imdata_d, NULL);
   this->freeDeviceMemory();
-
   if ((cudaDeviceSynchronize() != cudaSuccess))
     fprintf(stderr, "error in performForwardGpuNUFFT function: %s\n",
             cudaGetErrorString(cudaGetLastError()));

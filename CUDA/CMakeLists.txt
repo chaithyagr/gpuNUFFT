@@ -70,8 +70,8 @@ endif(GEN_MEX_FILES)
 
 #Options
 #General DEBUG output 
-SET (DEBUG false)
-OPTION(WITH_DEBUG "Enable DEBUG messages" OFF)
+SET (DEBUG true)
+OPTION(WITH_DEBUG "Enable DEBUG messages" ON)
 if (WITH_DEBUG)
  SET (DEBUG true)
 endif()
