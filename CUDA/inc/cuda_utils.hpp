@@ -220,7 +220,7 @@ inline void showMemoryInfo(bool force, FILE *stream)
   size_t total_mem = 0;
   cudaMemGetInfo(&free_mem, &total_mem);
   if (DEBUG || force)
-    fprintf(stream, "memory usage, free: %lu total: %lu\n", (SizeType)(free_mem),
+    printf("memory usage, free: %lu total: %lu\n", (SizeType)(free_mem),
     (SizeType)(total_mem));
 }
 
@@ -252,38 +252,5 @@ inline void showMemoryInfo()
  * @param symbol Const symbol name
  */
 void initConstSymbol(const char *symbol, const void *src, IndType count, cudaStream_t stream=0);
-
-/** \brief Initialize texture memory on device
- *
- * CUDA Kernel function prototype.
- *
- * @param symbol Texture symbol name
- */
-void initTexture(const char *symbol, cudaArray **devicePtr,
-                 gpuNUFFT::Array<DType> hostTexture);
-
-/** \brief Bind to 1-d texture on device
- *
- * CUDA Kernel function prototype.
- *
- * @param symbol Texture symbol name
- */
-void bindTo1DTexture(const char *symbol, void *devicePtr, IndType count);
-
-/** \brief Unbind from device texture
- *
- * CUDA Kernel function prototype.
- *
- * @param symbol Texture symbol name
- */
-void unbindTexture(const char *symbol);
-
-/** \brief Free texture memory on device
- *
- * CUDA Kernel function prototype.
- *
- * @param symbol Texture symbol name
- */
-void freeTexture(const char *symbol, cudaArray *devicePtr);
 
 #endif

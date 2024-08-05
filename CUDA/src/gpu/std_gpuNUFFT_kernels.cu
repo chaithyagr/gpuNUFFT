@@ -21,18 +21,6 @@ void initConstSymbol(const char* symbol, const void* src, IndType size, cudaStre
     HANDLE_ERROR(cudaMemcpyToSymbolAsync(KERNEL, src, size, 0, cudaMemcpyHostToDevice, stream));
 }
 
-void bindTo1DTexture(const char* symbol, void* devicePtr, IndType count)
-{
-  if (std::string("texDATA").compare(symbol)==0)
-  {
-    HANDLE_ERROR (cudaBindTexture(NULL,texDATA, devicePtr,(unsigned long)count*sizeof(float2)));
-  }
-  else if (std::string("texGDATA").compare(symbol)==0)
-  {
-    HANDLE_ERROR (cudaBindTexture(NULL,texGDATA, devicePtr,(unsigned long)count*sizeof(cufftComplex)));
-  }
-}
-
 __global__ void updateDensityCompKernel(DType2* density_data, DType2* estimation_data, long int N)
 {
   long int t = threadIdx.x + blockIdx.x * blockDim.x;
@@ -52,83 +40,6 @@ void performUpdateDensityComp(DType2* density_data, DType2* estimation_data, lon
   dim3 block_dim(64, 1, 8);
   dim3 grid_dim(getOptimalGridDim(n_samples,THREAD_BLOCK_SIZE));
   updateDensityCompKernel<<<grid_dim,block_dim>>>(density_data, estimation_data, n_samples);
-}
-
-void initTexture(const char* symbol, cudaArray** devicePtr, gpuNUFFT::Array<DType> hostTexture)
-{
-  if (std::string("texKERNEL").compare(symbol)==0)
-  {
-    HANDLE_ERROR(cudaMallocArray (devicePtr, &texKERNEL.channelDesc, hostTexture.dim.width, 1));
-    HANDLE_ERROR(cudaBindTextureToArray(texKERNEL, *devicePtr));
-    HANDLE_ERROR(cudaMemcpyToArray(*devicePtr, 0, 0, hostTexture.data, sizeof(float)*hostTexture.count(), cudaMemcpyHostToDevice));
-    
-    texKERNEL.filterMode = cudaFilterModePoint;
-    texKERNEL.normalized = true;
-    texKERNEL.addressMode[0] = cudaAddressModeClamp;
-  }
-  else if (std::string("texKERNEL2D").compare(symbol)==0)
-  {
-    HANDLE_ERROR(cudaMallocArray (devicePtr, &texKERNEL2D.channelDesc, hostTexture.dim.width, hostTexture.dim.height));
-
-    HANDLE_ERROR(cudaBindTextureToArray(texKERNEL2D, *devicePtr));
-    HANDLE_ERROR(cudaMemcpyToArray(*devicePtr, 0, 0, hostTexture.data, sizeof(float)*hostTexture.count(), cudaMemcpyHostToDevice));
-    
-    texKERNEL2D.filterMode = cudaFilterModeLinear;
-    texKERNEL2D.normalized = true;
-    texKERNEL2D.addressMode[0] = cudaAddressModeClamp;
-    texKERNEL2D.addressMode[1] = cudaAddressModeClamp;
-  }
-  else if (std::string("texKERNEL3D").compare(symbol)==0)
-  {
-    cudaExtent volumesize=make_cudaExtent(hostTexture.dim.width, hostTexture.dim.height, hostTexture.dim.depth); 
-    cudaMalloc3DArray(devicePtr,&texKERNEL3D.channelDesc,volumesize); 
-
-    cudaMemcpy3DParms copyparams = {0};
-    copyparams.extent=volumesize; 
-    copyparams.dstArray=*devicePtr; 
-    copyparams.kind=cudaMemcpyHostToDevice; 
-    copyparams.srcPtr= make_cudaPitchedPtr((void*)hostTexture.data,sizeof(float)*hostTexture.dim.width,hostTexture.dim.height,hostTexture.dim.depth); 
-
-    HANDLE_ERROR(cudaMemcpy3D(&copyparams)); 
-    HANDLE_ERROR(cudaBindTextureToArray(texKERNEL3D, *devicePtr));
-  
-    texKERNEL3D.filterMode = cudaFilterModeLinear;
-    texKERNEL3D.normalized = true;
-    texKERNEL3D.addressMode[0] = cudaAddressModeClamp;
-    texKERNEL3D.addressMode[1] = cudaAddressModeClamp;
-    texKERNEL3D.addressMode[2] = cudaAddressModeClamp;
-  }
-}
-
-void unbindTexture(const char* symbol)
-{
-  if (std::string("texKERNEL").compare(symbol)==0)
-  {
-    HANDLE_ERROR(cudaUnbindTexture(texKERNEL));    
-  }
-  else if (std::string("texKERNEL2D").compare(symbol)==0)
-  {
-    HANDLE_ERROR(cudaUnbindTexture(texKERNEL2D));    
-  }
-  else if (std::string("texKERNEL3D").compare(symbol)==0)
-  {
-    HANDLE_ERROR(cudaUnbindTexture(texKERNEL3D));    
-  }
-  else if (std::string("texDATA").compare(symbol)==0)
-  {
-    HANDLE_ERROR(cudaUnbindTexture(texDATA));    
-  }
-  else if (std::string("texGDATA").compare(symbol)==0)
-  {
-    HANDLE_ERROR(cudaUnbindTexture(texGDATA));    
-  }
-}
-
-
-void freeTexture(const char* symbol, cudaArray* devicePtr)
-{
-  unbindTexture(symbol);
-  HANDLE_ERROR(cudaFreeArray(devicePtr));  
 }
 
 __global__ void fftScaleKernel(CufftType* data, DType scaling, long int N)
