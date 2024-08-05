@@ -222,13 +222,7 @@ class GpuNUFFTPythonOperator
         if(interpolate_data)
             gpuNUFFTOp->performForwardGpuNUFFT(image_gpu, kspace_data_gpu, gpuNUFFT::DENSITY_ESTIMATION);
         else
-        {
-            for(long int i=0; i<100000; i++)
-            {
-                printf("i = %ld\n", i);
-                gpuNUFFTOp->performForwardGpuNUFFT(image_gpu, kspace_data_gpu);
-            }
-        }
+            gpuNUFFTOp->performForwardGpuNUFFT(image_gpu, kspace_data_gpu);
         cudaDeviceSynchronize();
     }
 
@@ -448,7 +442,6 @@ class GpuNUFFTPythonOperator
     }
     ~GpuNUFFTPythonOperator()
     {
-        printf("Destructor called\n");
         delete gpuNUFFTOp;
     }
 };

@@ -7,7 +7,6 @@ cuda_include_directories(${GPUNUFFT_INC_DIR})
 
 set(GPU_CU_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/atomic_gpuNUFFT.cu 	
 					#${CMAKE_CURRENT_SOURCE_DIR}/atomic_gpuNUFFT_kernels.cu 
-					#${CMAKE_CURRENT_SOURCE_DIR}/texture_gpuNUFFT_kernels.cu 
 					#${CMAKE_CURRENT_SOURCE_DIR}/../std_gpuNUFFT_kernels.cu
 									 )
 if(WIN32)

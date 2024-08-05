@@ -10,11 +10,6 @@
 #include <limits>
 #include <cstring>
 
-void gpuNUFFT::GpuNUFFTOperatorFactory::setUseTextures(bool useTextures)
-{
-  this->useTextures = useTextures;
-}
-
 void gpuNUFFT::GpuNUFFTOperatorFactory::setBalanceWorkload(bool balanceWorkload)
 {
   this->balanceWorkload = balanceWorkload;
@@ -119,9 +114,6 @@ void gpuNUFFT::GpuNUFFTOperatorFactory::computeProcessingOrder(
   std::memcpy(sectorProcessingOrder.data, processingOrder.data(), processingOrder.size() * sizeof(IndType2));
   if (gpuNUFFTOp->getType() == gpuNUFFT::BALANCED)
     static_cast<BalancedGpuNUFFTOperator *>(gpuNUFFTOp)
-        ->setSectorProcessingOrder(sectorProcessingOrder);
-  else
-    static_cast<BalancedTextureGpuNUFFTOperator *>(gpuNUFFTOp)
         ->setSectorProcessingOrder(sectorProcessingOrder);
 }
 
@@ -327,33 +319,14 @@ gpuNUFFT::GpuNUFFTOperatorFactory::createNewGpuNUFFTOperator(
 {
   if (balanceWorkload)
   {
-    if (useTextures)
-    {
-      debug("creating Balanced 2D TextureLookup Operator!\n");
-      return new gpuNUFFT::BalancedTextureGpuNUFFTOperator(
-          kernelWidth, sectorWidth, osf, imgDims, TEXTURE2D_LOOKUP,
-          this->matlabSharedMem);
-    }
-    else
-    {
-      debug("creating Balanced GpuNUFFT Operator!\n");
-      return new gpuNUFFT::BalancedGpuNUFFTOperator(kernelWidth, sectorWidth,
-        osf, imgDims, this->matlabSharedMem);
-    }
+    debug("creating Balanced GpuNUFFT Operator!\n");
+    return new gpuNUFFT::BalancedGpuNUFFTOperator(kernelWidth, sectorWidth,
+      osf, imgDims, this->matlabSharedMem);
   }
 
-  if (useTextures)
-  {
-    debug("creating 2D TextureLookup Operator!\n");
-    return new gpuNUFFT::TextureGpuNUFFTOperator(kernelWidth, sectorWidth, osf,
-      imgDims, TEXTURE2D_LOOKUP, this->matlabSharedMem);
-  }
-  else
-  {
-    debug("creating DEFAULT GpuNUFFT Operator!\n");
-    return new gpuNUFFT::GpuNUFFTOperator(kernelWidth, sectorWidth, osf,
+  debug("creating DEFAULT GpuNUFFT Operator!\n");
+  return new gpuNUFFT::GpuNUFFTOperator(kernelWidth, sectorWidth, osf,
                                           imgDims, true, DEFAULT, true);
-  }
 }
 
 gpuNUFFT::Array<DType> gpuNUFFT::GpuNUFFTOperatorFactory::computeDeapodizationFunction(
@@ -365,11 +338,7 @@ gpuNUFFT::Array<DType> gpuNUFFT::GpuNUFFTOperatorFactory::computeDeapodizationFu
   IndType sectorWidth = 8;
   gpuNUFFT::GpuNUFFTOperator *deapoGpuNUFFTOp;
 
-  if (useTextures)
-    deapoGpuNUFFTOp = new gpuNUFFT::TextureGpuNUFFTOperator(kernelWidth, sectorWidth, osf,
-    imgDims, TEXTURE2D_LOOKUP);
-  else
-    deapoGpuNUFFTOp = new gpuNUFFT::GpuNUFFTOperator(kernelWidth, sectorWidth, osf, imgDims);
+  deapoGpuNUFFTOp = new gpuNUFFT::GpuNUFFTOperator(kernelWidth, sectorWidth, osf, imgDims);
 
   // Data
   gpuNUFFT::Array<DType2> dataArray;
@@ -540,8 +509,8 @@ void gpuNUFFT::GpuNUFFTOperatorFactory::set_pts(
   gpuNUFFTOp->setSectorDataCount(
       computeSectorDataCount(gpuNUFFTOp, assignedSectors));
 
-  if (gpuNUFFTOp->getType() == gpuNUFFT::BALANCED ||
-    gpuNUFFTOp->getType() == gpuNUFFT::BALANCED_TEXTURE) {
+  if (gpuNUFFTOp->getType() == gpuNUFFT::BALANCED)
+  {
     computeProcessingOrder(gpuNUFFTOp);
   }
 
@@ -604,9 +573,6 @@ gpuNUFFT::GpuNUFFTOperatorFactory::loadPrecomputedGpuNUFFTOperator(
 
   if (gpuNUFFTOp->getType() == gpuNUFFT::BALANCED)
     static_cast<BalancedGpuNUFFTOperator *>(gpuNUFFTOp)
-        ->setSectorProcessingOrder(sectorProcessingOrder);
-  else if (gpuNUFFTOp->getType() == gpuNUFFT::BALANCED_TEXTURE)
-    static_cast<BalancedTextureGpuNUFFTOperator *>(gpuNUFFTOp)
         ->setSectorProcessingOrder(sectorProcessingOrder);
 
   gpuNUFFTOp->setSectorCenters(sectorCenters);
