@@ -980,7 +980,13 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
       performSensMul(imdata_d, sens_d, gi_host, false);
     }
 
-	 if(gpuNUFFTOut == DENSITY_ESTIMATION)
+    // apodization Correction
+    performForwardDeapodization(imdata_d, deapo_d, gi_host);
+    if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
+      printf("error at thread synchronization 2: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
+    
+    if(gpuNUFFTOut == DENSITY_ESTIMATION)
       {
         // convolution and resampling to non-standard trajectory
         forwardConvolution(data_d, crds_d, imdata_d, NULL, sectors_d,
@@ -1010,11 +1016,6 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
         this->freeDeviceMemory();
         return;
     } 
-    // apodization Correction
-    performForwardDeapodization(imdata_d, deapo_d, gi_host);
-    if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
-      printf("error at thread synchronization 2: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
     // resize by oversampling factor and zero pad
     performPadding(imdata_d, gdata_d, gi_host);
 
@@ -1210,10 +1211,16 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
                         imdata_count * n_coils_cc, new_stream);
       performSensMul(imdata_d, sens_d, gi_host, false);
     }
+    // apodization Correction
+    performForwardDeapodization(imdata_d, deapo_d, gi_host);
+    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
+      printf("error at thread synchronization 2: %s\n",
+             cudaGetErrorString(cudaGetLastError()));
+    
 
 	  if(gpuNUFFTOut == DENSITY_ESTIMATION)
 	  {
-	      forwardConvolution(data_d, crds_d, imdata_d, NULL, sectors_d,
+	    forwardConvolution(data_d, crds_d, imdata_d, NULL, sectors_d,
                        sector_centers_d, gi_host);
         writeOrderedGPU(data_sorted_d, data_indices_d, data_d,
                     (int)this->kSpaceTraj.count(), n_coils_cc);
@@ -1233,11 +1240,6 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
         this->freeDeviceMemory();
         return;
     }
-    // apodization Correction
-    performForwardDeapodization(imdata_d, deapo_d, gi_host);
-    if (DEBUG && (cudaThreadSynchronize() != cudaSuccess))
-      printf("error at thread synchronization 2: %s\n",
-             cudaGetErrorString(cudaGetLastError()));
     // resize by oversampling factor and zero pad
     performPadding(imdata_d, gdata_d, gi_host);
 
