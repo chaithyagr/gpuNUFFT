@@ -93,18 +93,27 @@ class GpuNUFFTOperator
 
   void setKSpaceTraj(Array<DType> kSpaceTraj)
   {
+    if (this->kSpaceTraj.data != NULL)
+      freeLocalMemberArray(this->kSpaceTraj.data);
     this->kSpaceTraj = kSpaceTraj;
   }
   void setSectorCenters(Array<IndType> sectorCenters)
   {
+    if(this->sectorCenters.data != NULL)
+      freeLocalMemberArray(this->sectorCenters.data);
     this->sectorCenters = sectorCenters;
   }
   void setSectorDataCount(Array<IndType> sectorDataCount)
   {
+    if(this->sectorDataCount.data != NULL)
+      freeLocalMemberArray(this->sectorDataCount.data);
+
     this->sectorDataCount = sectorDataCount;
   }
   void setDataIndices(Array<IndType> dataIndices)
   {
+    if (this->dataIndices.data != NULL)
+      freeLocalMemberArray(this->dataIndices.data);
     this->dataIndices = dataIndices;
   }
   void setSens(Array<DType2> sens)
@@ -113,10 +122,14 @@ class GpuNUFFTOperator
   }
   void setDens(Array<DType> dens)
   {
+    if (this->dens.data != NULL)
+      freeLocalMemberArray(this->dens.data);
     this->dens = dens;
   }
   void setDeapodizationFunction(Array<DType> deapo)
   {
+    if (this->deapo.data != NULL)
+      freeLocalMemberArray(this->deapo.data);
     this->deapo= deapo;
   }
 
