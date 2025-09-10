@@ -106,7 +106,7 @@ class GpuNUFFTPythonOperator
 {
     gpuNUFFT::GpuNUFFTOperatorFactory factory;
     gpuNUFFT::GpuNUFFTOperator *gpuNUFFTOp;
-    int trajectory_length, n_coils, dimension;
+    int trajectory_length, n_coils, dimension, gpu_device_id;
     float osr;
     bool has_sense_data;
     gpuNUFFT::Dimensions imgDims;
@@ -130,8 +130,13 @@ class GpuNUFFTPythonOperator
     public:
     GpuNUFFTPythonOperator(py::array_t<DType> kspace_loc, py::array_t<int> image_size, int num_coils,
     py::array_t<std::complex<DType>> sense_maps,  py::array_t<DType> density_comp, int kernel_width=3,
-    int sector_width=8, float osr=2, bool balance_workload=1) : osr(osr)
+    int sector_width=8, float osr=2, bool balance_workload=1, int gpu_device_id = 0) : osr(osr)
     {
+        cudaError_t err = cudaSetDevice(gpu_device_id);
+        if (err != cudaSuccess) {
+            std::cerr << "Failed to set CUDA device: " << cudaGetErrorString(err) << std::endl;
+        }
+        cudaDeviceSynchronize(); 
         // k-space coordinates
         py::buffer_info sample_loc = kspace_loc.request();
         trajectory_length = sample_loc.shape[1];
@@ -448,8 +453,8 @@ class GpuNUFFTPythonOperator
 
 PYBIND11_MODULE(gpuNUFFT, m) {
     py::class_<GpuNUFFTPythonOperator>(m, "NUFFTOp")
-        .def(py::init<py::array_t<DType>, py::array_t<int>, int, py::array_t<std::complex<DType>>, py::array_t<DType>, int, int, float, bool>(),
-            py::arg("kspace_loc"), py::arg("image_size"), py::arg("num_coils"), py::arg("sense_maps") = py::none(), py::arg("density_comp") = py::none(), py::arg("kernel_width") = 3, py::arg("sector_width") = 8, py::arg("osr") = 2, py::arg("balance_workload") = true)
+        .def(py::init<py::array_t<DType>, py::array_t<int>, int, py::array_t<std::complex<DType>>, py::array_t<DType>, int, int, float, bool, int>(),
+            py::arg("kspace_loc"), py::arg("image_size"), py::arg("num_coils"), py::arg("sense_maps") = py::none(), py::arg("density_comp") = py::none(), py::arg("kernel_width") = 3, py::arg("sector_width") = 8, py::arg("osr") = 2, py::arg("balance_workload") = true, py::arg("gpu_device_id") = 0)
         .def("op", &GpuNUFFTPythonOperator::op, py::arg("in_image"), py::arg("out_kspace"), py::arg("interpolate_data") = false)
         .def("op_direct", &GpuNUFFTPythonOperator::op_direct, py::arg("in_image"), py::arg("out_kspace"), py::arg("interpolate_data") = false)
         .def("adj_op_direct", &GpuNUFFTPythonOperator::adj_op_direct, py::arg("in_kspace"), py::arg("out_image"), py::arg("grid_data") = false)
