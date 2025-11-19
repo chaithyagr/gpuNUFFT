@@ -26,9 +26,6 @@ class CMakeBuild(build_ext):
         """ Pre-install PyPi packages before running cmake.
         """
 
-        subprocess.check_call(
-            [sys.executable, '-m', 'pip', 'install', package]
-        )
 
 
     def _set_pybind_path(self):
@@ -103,7 +100,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="gpuNUFFT",
-    version="0.10.1",
+    version="0.10.3",
     description="gpuNUFFT - An open source GPU Library for 3D Gridding and NUFFT",
     ext_modules=[
         CMakeExtension("gpuNUFFT", sourcedir=os.path.join("CUDA")),
