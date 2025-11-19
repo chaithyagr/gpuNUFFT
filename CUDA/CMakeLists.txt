@@ -100,17 +100,14 @@ IF(FERMI_GPU)
   list(APPEND MY_NVCC_FLAGS -gencode arch=compute_30,code=sm_30)
   list(APPEND MY_NVCC_FLAGS -gencode arch=compute_50,code=sm_50)
   list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_52,code=sm_52)
-  list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_52,code=compute_52)
   list(APPEND MY_NVCC_FLAGS -gencode arch=compute_50,code=sm_50)
 ELSE(FERMI_GPU)
   list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_52,code=sm_52)
-  list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_52,code=compute_52)
 
   if(${CUDA_VERSION_MAJOR} GREATER 7)
     message("add CUDA 8 flags: Current version: ${CUDA_VERSION}")
     list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_60,code=sm_60)
     list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_61,code=sm_61)
-    list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_61,code=compute_61)
   endif()
 
   if(${CUDA_VERSION_MAJOR} GREATER 8)
@@ -208,4 +205,5 @@ OUTPUT_VARIABLE _file_list
 	    RESULT_VARIABLE _result
 	)
 endif(GEN_ZIP)
+
 
