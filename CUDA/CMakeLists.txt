@@ -119,6 +119,35 @@ ELSE(FERMI_GPU)
     message("add CUDA 10 flags: Current version: ${CUDA_VERSION}")
     list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_75,code=sm_75)
   endif()
+  
+  # Add support for Ada Lovelace (RTX 40-series / RTX Ada Generation)
+  if(${CUDA_VERSION_MAJOR} GREATER 11)
+      message("add CUDA 12 flags: Current version: ${CUDA_VERSION}")
+      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_89,code=sm_89)
+  endif()
+
+  # --- Ampere (RTX 30-series / A100) ---
+  if(${CUDA_VERSION_MAJOR} GREATER 10)
+      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_80,code=sm_80)
+      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_86,code=sm_86)
+  endif()
+  
+  # --- Ada Lovelace (Your RTX 6000 Ada) & Hopper (H100) ---
+  if(${CUDA_VERSION_MAJOR} GREATER 11)
+      # Your current GPU (Ada)
+      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_89,code=sm_89)
+      # Hopper (Data Center H100)
+      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_90,code=sm_90)
+  endif()
+  
+  # --- Blackwell (RTX 50-series / B200) ---
+  # Note: Requires CUDA 12.8 or 13.0+
+  if(${CUDA_VERSION} VERSION_GREATER_EQUAL "12.8")
+      message("Adding Blackwell support")
+      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_100,code=sm_100)
+      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_120,code=sm_120)
+  endif()
+
 
 ENDIF(FERMI_GPU)
 
