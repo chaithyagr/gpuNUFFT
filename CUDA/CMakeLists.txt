@@ -33,7 +33,7 @@ endif(WIN32)
 
 #Enable Mex File Generation
 #Searching MATLAB
-SET(GEN_MEX_FILES ON CACHE BOOL "Enable generation of Matlab MEX files.")
+SET(GEN_MEX_FILES OFF CACHE BOOL "Enable generation of Matlab MEX files.")
 
 if(GEN_MEX_FILES)
   if(WIN32)
@@ -84,7 +84,7 @@ SET(GEN_TESTS OFF CACHE BOOL "Enable and generate simple GOOGLE test framework u
 SET(GPU_DOUBLE_PREC OFF CACHE BOOL "Enable double precision floating point operations on GPU (Compute Capability 1.3 needed)")
 
 #Option to enable python bindings
-SET(GEN_PYTHON_FILES OFF CACHE BOOL "Enable generation of Python binding files.")
+SET(GEN_PYTHON_FILES ON CACHE BOOL "Enable generation of Python binding files.")
 
 if(GPU_DOUBLE_PREC)
   SET(PREC_SUFFIX "_d")
@@ -92,28 +92,9 @@ else(GPU_DOUBLE_PREC)
   SET(PREC_SUFFIX "_f")
 endif(GPU_DOUBLE_PREC)
 
-SET(FERMI_GPU OFF CACHE BOOL "Enable build for (old) Fermi architectures (Compute capability 2.0)")
 
 set(MY_NVCC_FLAGS -I${CUDA_INCLUDE_DIRS})
 set(CMAKE_CXX_FLAGS -I${CUDA_INCLUDE_DIRS})
-IF(FERMI_GPU)
-  list(APPEND MY_NVCC_FLAGS -gencode arch=compute_30,code=sm_30)
-  list(APPEND MY_NVCC_FLAGS -gencode arch=compute_50,code=sm_50)
-  list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_52,code=sm_52)
-  list(APPEND MY_NVCC_FLAGS -gencode arch=compute_50,code=sm_50)
-ELSE(FERMI_GPU)
-  list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_52,code=sm_52)
-
-  if(${CUDA_VERSION_MAJOR} GREATER 7)
-    message("add CUDA 8 flags: Current version: ${CUDA_VERSION}")
-    list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_60,code=sm_60)
-    list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_61,code=sm_61)
-  endif()
-
-  if(${CUDA_VERSION_MAJOR} GREATER 8)
-    message("add CUDA 9 flags: Current version: ${CUDA_VERSION}")
-    list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_70,code=sm_70)
-  endif()
 
   if(${CUDA_VERSION_MAJOR} GREATER 9)
     message("add CUDA 10 flags: Current version: ${CUDA_VERSION}")
@@ -148,8 +129,6 @@ ELSE(FERMI_GPU)
       list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_120,code=sm_120)
   endif()
 
-
-ENDIF(FERMI_GPU)
 
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
   MESSAGE("debug mode")

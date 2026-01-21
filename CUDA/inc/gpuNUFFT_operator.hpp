@@ -381,6 +381,20 @@ class GpuNUFFTOperator
     return operatorType;
   }
 
+  /** \brief Function to allocate all neccessary device memory used by the
+   * GriddingOperator. */
+  void initDeviceMemory(int n_coils, int n_coils_cc = 1);
+
+  /** \brief Function to free the neccessary device memory used by the
+   * GriddingOperator. */
+  void freeDeviceMemory();
+  
+  /** \brief Gridding Info meta information.
+  *
+  * @see gpuNUFFT::GpuNUFFTOperator::initGpuNUFFTInfo
+  */
+  GpuNUFFTInfo *gi_host;
+
  protected:
 
    template<typename T>
@@ -548,12 +562,6 @@ class GpuNUFFTOperator
   /** \brief Flag to determine debugging of GPU kernel execution times */
   bool debugTiming;
 
-  /** \brief Gridding Info meta information.
-    *
-    * @see gpuNUFFT::GpuNUFFTOperator::initGpuNUFFTInfo
-    */
-  GpuNUFFTInfo *gi_host;
-
   // GPU Device Members
 
   /** \brief GPU Device pointer to sensitivity array elements. */
@@ -588,14 +596,6 @@ class GpuNUFFTOperator
   void startTiming();
   /** \brief Function to stop CUDA timing test. */
   float stopTiming();
-
-  /** \brief Function to allocate all neccessary device memory used by the
-   * GriddingOperator. */
-  void initDeviceMemory(int n_coils, int n_coils_cc = 1);
-
-  /** \brief Function to free the neccessary device memory used by the
-   * GriddingOperator. */
-  void freeDeviceMemory();
 
   /** \brief Update amount of concurrently computed coils
    */
