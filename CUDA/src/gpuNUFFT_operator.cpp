@@ -484,7 +484,8 @@ void gpuNUFFT::GpuNUFFTOperator::performGpuNUFFTAdj(
     if (debugTiming)
       startTiming();
 
-    performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
+    if (gpuNUFFTOut != TOEPLITZ)
+        performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
 
     if (DEBUG && (cudaDeviceSynchronize() != cudaSuccess))
       fprintf(stderr, "error at adj thread synchronization 4: %s\n",
@@ -521,7 +522,8 @@ void gpuNUFFT::GpuNUFFTOperator::performGpuNUFFTAdj(
     if (DEBUG && (cudaDeviceSynchronize() != cudaSuccess))
       printf("error at adj thread synchronization 5: %s\n",
              cudaGetErrorString(cudaGetLastError()));
-    performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
+    if (gpuNUFFTOut != TOEPLITZ)
+        performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
 
     if (debugTiming)
       printf("iFFT (incl. shift) : %.2f ms\n", stopTiming());
@@ -1032,7 +1034,8 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
       printf("error at thread synchronization 3: %s\n",
              cudaGetErrorString(cudaGetLastError()));
     // shift image to get correct zero frequency position
-    performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
+    if (gpuNUFFTOut != TOEPLITZ)
+        performFFTShift(gdata_d, INVERSE, getGridDims(), gi_host);
 
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 4: %s\n",
@@ -1055,7 +1058,8 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 5: %s\n",
              cudaGetErrorString(cudaGetLastError()));
-    performFFTShift(gdata_d, grad_mode?INVERSE:FORWARD, getGridDims(), gi_host);
+    if (gpuNUFFTOut != TOEPLITZ)
+        performFFTShift(gdata_d, grad_mode?INVERSE:FORWARD, getGridDims(), gi_host);
 
     if (DEBUG && (cudaStreamSynchronize(new_stream) != cudaSuccess))
       printf("error at thread synchronization 6: %s\n",
@@ -1070,6 +1074,14 @@ void gpuNUFFT::GpuNUFFTOperator::performForwardGpuNUFFT(
     if(gpuNUFFTOut == TOEPLITZ)
     {
         performFFTScaling(gdata_d, gi_host->grid_width_dim, gi_host);
+        if(coil_it > 1)
+        {
+            cudaStreamSynchronize(old_stream);
+            cudaStreamDestroy(old_stream);
+        }
+        old_stream = new_stream;
+        if ((coil_it + n_coils_cc) < (n_coils))
+            continue;
         cudaStreamSynchronize(old_stream);
         cudaStreamDestroy(old_stream);
         freeTotalDeviceMemory(imdata_d, NULL);
