@@ -291,6 +291,23 @@ class GpuNUFFTPythonOperator
       );
     }
 
+    void toeplitz_op_direct(uintptr_t in_image, uintptr_t out_image, uintptr_t kernel)
+    {
+        image_gpu.data = (DType2*) in_image;
+        // For now always n_coils_cc = 1
+        gpuNUFFTOp->initDeviceMemory(kspace_data.dim.channels, 1);
+        gpuNUFFTOp->performForwardGpuNUFFT(image_gpu, kspace_data_gpu, gpuNUFFT::TOEPLITZ);
+        cudaDeviceSynchronize();
+        // Perform multiplication with kernel
+        performSensMul(kspace_data_gpu.data, (DType2*) kernel, gpuNUFFTOp->gi_host, false, true);
+        cudaDeviceSynchronize();
+        image_gpu.data = (DType2*) out_image;        
+        gpuNUFFTOp->performGpuNUFFTAdj(kspace_data_gpu, image_gpu, gpuNUFFT::TOEPLITZ);
+
+        gpuNUFFTOp->freeDeviceMemory();
+        cudaDeviceSynchronize();
+    }
+
     void clean_memory()
     {
        gpuNUFFTOp->clean_memory();
@@ -459,6 +476,7 @@ PYBIND11_MODULE(gpuNUFFT, m) {
         .def("op_direct", &GpuNUFFTPythonOperator::op_direct, py::arg("in_image"), py::arg("out_kspace"), py::arg("interpolate_data") = false)
         .def("adj_op_direct", &GpuNUFFTPythonOperator::adj_op_direct, py::arg("in_kspace"), py::arg("out_image"), py::arg("grid_data") = false)
         .def("adj_op",  &GpuNUFFTPythonOperator::adj_op, py::arg("in_kspace"), py::arg("out_image"),  py::arg("grid_data") = false)
+        .def("toeplitz_op", &GpuNUFFTPythonOperator::toeplitz_op_direct, py::arg("in_image"), py::arg("out_image"), py::arg("kernel"))
         .def("clean_memory", &GpuNUFFTPythonOperator::clean_memory)
         .def("estimate_density_comp", &GpuNUFFTPythonOperator::estimate_density_comp, py::arg("max_iter") = 10)
         .def("set_smaps", &GpuNUFFTPythonOperator::set_smaps)

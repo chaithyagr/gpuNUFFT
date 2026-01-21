@@ -179,11 +179,11 @@ void performDensityCompensation(DType2 *data, DType *density_comp,
   * @param imdata_d image data
   * @param sens_d complex coil sensitivity
   * @param gi_host Info struct with meta information
-  * @param conjugate Flag whether to apply complex conjugate of sensitivity or
-  *not
+  * @param conjugate Flag whether to apply complex conjugate of sensitivity or not
+  * @param use_grid_dim Flag whether to use grid dimension or image dimension
   */
 void performSensMul(CufftType *imdata_d, DType2 *sens_d,
-                    gpuNUFFT::GpuNUFFTInfo *gi_host, bool conjugate);
+                    gpuNUFFT::GpuNUFFTInfo *gi_host, bool conjugate, bool use_grid_dim = false);
 
 /** \brief Perform a element-wise summation over multiple coil images
   *

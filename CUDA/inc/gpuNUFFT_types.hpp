@@ -190,6 +190,7 @@ enum GpuNUFFTOutput
   /** \brief Stop after deapodization step. */
   DEAPODIZATION,
   DENSITY_ESTIMATION,
+  TOEPLITZ,
 };
 
 /** \brief FFT shift direction enum. */

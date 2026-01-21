@@ -105,18 +105,19 @@ __global__ void conjSensMulKernel(CufftType* imdata, DType2* sens, int N)
 void performSensMul(CufftType* imdata_d,
   DType2* sens_d,
   gpuNUFFT::GpuNUFFTInfo* gi_host,
-  bool conjugate)
+  bool conjugate,
+  bool use_grid_dim)
 {
   if (DEBUG)
     printf("perform sensitivity multiplication \n");
 
-  dim3 grid_dim(getOptimalGridDim(gi_host->im_width_dim,THREAD_BLOCK_SIZE));
+  dim3 grid_dim(getOptimalGridDim(use_grid_dim?gi_host->grid_width_dim:gi_host->im_width_dim,THREAD_BLOCK_SIZE));
   //dim3 block_dim(THREAD_BLOCK_SIZE);
   dim3 block_dim(64, 1, 8);
   if (conjugate)
-    conjSensMulKernel<<<grid_dim,block_dim>>>(imdata_d,sens_d,gi_host->im_width_dim);
+    conjSensMulKernel<<<grid_dim,block_dim>>>(imdata_d,sens_d,use_grid_dim?gi_host->grid_width_dim:gi_host->im_width_dim);
   else
-    sensMulKernel<<<grid_dim,block_dim>>>(imdata_d,sens_d,gi_host->im_width_dim);
+    sensMulKernel<<<grid_dim,block_dim>>>(imdata_d,sens_d,use_grid_dim?gi_host->grid_width_dim:gi_host->im_width_dim);
 }
 
 __global__ void sensSumKernel(CufftType* imdata, DType2* imdata_sum, int N)
