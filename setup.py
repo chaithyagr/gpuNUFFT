@@ -100,7 +100,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="gpuNUFFT",
-    version="0.10.6",
+    version="0.10.7",
     description="gpuNUFFT - An open source GPU Library for 3D Gridding and NUFFT",
     ext_modules=[
         CMakeExtension("gpuNUFFT", sourcedir=os.path.join("CUDA")),
