@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter Development)
+find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter Development.Module)
 
 MESSAGE(STATUS "Building Python interface")
 MESSAGE("Pybind11 include dir ${PYBIND11_INCLUDE_DIR}")
@@ -23,7 +23,18 @@ if(WIN32)
 elseif(UNIX)
     TARGET_LINK_LIBRARIES(gpuNUFFT ${CUDA_LIBRARIES})
 endif(WIN32)
+# Only cuFFT is needed (no cuBLAS / cuRAND, see vector_kernels.cu).
 CUDA_ADD_CUFFT_TO_TARGET(gpuNUFFT)
-CUDA_ADD_CUBLAS_TO_TARGET(gpuNUFFT)
-target_link_libraries(gpuNUFFT ${CUDA_curand_LIBRARY})
+
+# For binary wheels: look up the CUDA library (cuFFT) in the
+# NVIDIA pip package installed next to the module in site-packages, e.g.
+# GPUNUFFT_RPATH="$ORIGIN/nvidia/cu13/lib". The absolute toolkit path of the
+# build machine is NOT embedded in that case.
+SET(GPUNUFFT_RPATH "" CACHE STRING "RPATH to embed in the python module (wheel builds)")
+if(GPUNUFFT_RPATH AND UNIX)
+    message(STATUS "Python module RPATH: ${GPUNUFFT_RPATH}")
+    set_target_properties(gpuNUFFT PROPERTIES
+        BUILD_WITH_INSTALL_RPATH ON
+        INSTALL_RPATH "${GPUNUFFT_RPATH}")
+endif()
 

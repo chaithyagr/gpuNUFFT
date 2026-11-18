@@ -14,10 +14,11 @@ Carole Lazarus <carole.m.lazarus@gmail.com>
 #include "cufft.h"
 #include "cuda_runtime.h"
 #include <cuda.h>
-#include <cublas_v2.h>
-#include <curand.h>
 #include "config.hpp"
 #include "gpuNUFFT_operator_factory.hpp"
+#include "vector_kernels.hpp"
+#include <ctime>
+#include <random>
 #include <algorithm>  // std::sort
 #include <vector>     // std::vector
 #include <string>
@@ -424,22 +425,22 @@ class GpuNUFFTPythonOperator
         DType norm_old = 1.0;
         DType norm_new = 1.0;
         DType inv_norm = 1.0;
-        // initialisation: create a random complex image.
-        curandGenerator_t generator;
-        curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_XORWOW);
-        curandSetPseudoRandomGeneratorSeed(generator, (int)time(NULL));
+        // initialisation: create a random complex image, uniform in [0, 1).
+        {
+            std::mt19937 rng((unsigned int)time(NULL));
+            std::uniform_real_distribution<DType> uniform(0.0, 1.0);
+            std::vector<DType2> x_init(im_size);
+            for (int j = 0; j < im_size; j++)
+            {
+                x_init[j].x = uniform(rng);
+                x_init[j].y = uniform(rng);
+            }
+            copyToDevice(x_init.data(), x_gpu.data, im_size);
+        }
 
-        // complex value generator by giving twice the size.
-        curandGenerateUniform(generator, (DType *)x_gpu.data, 2 * im_size);
-        // xold = initialize random x of image size.
-        curandDestroyGenerator(generator);
-        // Create a handle
-        cublasHandle_t handle;
-        cublasCreate(&handle);
-
-        cublasScnrm2(handle, im_size, x_gpu.data, 1, &norm_old);
+        norm_old = gpuNUFFT::computeComplexNorm(x_gpu.data, im_size);
         inv_norm = 1.0 / norm_old;
-        cublasCsscal(handle, im_size, &inv_norm, x_gpu.data, 1);
+        gpuNUFFT::scaleComplexVector(x_gpu.data, inv_norm, im_size);
 
         for (int i = 0; i < max_iter; i++)
         {
@@ -447,11 +448,10 @@ class GpuNUFFTPythonOperator
           gpuNUFFTOp->performForwardGpuNUFFT(x_gpu, tmp_kspace_gpu);
           gpuNUFFTOp->performGpuNUFFTAdj(tmp_kspace_gpu, x_gpu);
           // compute ||x_new||
-          cublasScnrm2(handle, im_size, x_gpu.data, 1, &norm_new);
+          norm_new = gpuNUFFT::computeComplexNorm(x_gpu.data, im_size);
           // x_new <- x_new/ ||x_new||
           inv_norm = 1.0 / norm_new;
-
-          cublasCsscal(handle, im_size, &inv_norm, x_gpu.data, 1);
+          gpuNUFFT::scaleComplexVector(x_gpu.data, inv_norm, im_size);
           if (fabs(norm_new - norm_old) < tolerance)
           {
                 break;
@@ -459,7 +459,6 @@ class GpuNUFFTPythonOperator
           norm_old = norm_new;
         }
         freeTotalDeviceMemory(tmp_kspace_gpu.data, x_gpu.data, NULL);
-        cublasDestroy(handle);
         return norm_new;
     }
     ~GpuNUFFTPythonOperator()
@@ -468,7 +467,55 @@ class GpuNUFFTPythonOperator
     }
 };
 
+static int get_cuda_driver_version()
+{
+    int version = 0;
+    // Does not create a CUDA context; returns 0 if no driver is installed.
+    if (cudaDriverGetVersion(&version) != cudaSuccess)
+        version = 0;
+    return version;
+}
+
+static void check_cuda_driver_compat()
+{
+    const int driver = get_cuda_driver_version();
+    const int runtime = CUDART_VERSION;
+    char msg[512];
+    if (driver == 0)
+    {
+        snprintf(msg, sizeof(msg),
+                 "gpuNUFFT: no NVIDIA driver was found. gpuNUFFT requires an "
+                 "NVIDIA GPU with a driver supporting CUDA >= %d.0.",
+                 runtime / 1000);
+    }
+    else if (driver / 1000 < runtime / 1000)
+    {
+        snprintf(msg, sizeof(msg),
+                 "gpuNUFFT was built with CUDA %d.%d but the installed NVIDIA "
+                 "driver only supports CUDA %d.%d. GPU calls will fail with "
+                 "'CUDA driver version is insufficient'. Update the NVIDIA "
+                 "driver, install the build matching your driver (e.g. "
+                 "'pip install gpuNUFFT-cu12' for CUDA 12 drivers), or build "
+                 "from source: pip install --no-binary gpuNUFFT gpuNUFFT",
+                 runtime / 1000, (runtime % 1000) / 10,
+                 driver / 1000, (driver % 1000) / 10);
+    }
+    else
+    {
+        return;
+    }
+    // Raises if warnings are turned into errors (python -W error).
+    if (PyErr_WarnEx(PyExc_RuntimeWarning, msg, 1) < 0)
+        throw py::error_already_set();
+}
+
 PYBIND11_MODULE(gpuNUFFT, m) {
+    m.attr("cuda_runtime_version") = CUDART_VERSION;
+    m.def("cuda_driver_version", &get_cuda_driver_version,
+          "CUDA version supported by the installed NVIDIA driver "
+          "(1000*major + 10*minor), 0 if no driver is present.");
+    check_cuda_driver_compat();
+
     py::class_<GpuNUFFTPythonOperator>(m, "NUFFTOp")
         .def(py::init<py::array_t<DType>, py::array_t<int>, int, py::array_t<std::complex<DType>>, py::array_t<DType>, int, int, float, bool, int>(),
             py::arg("kspace_loc"), py::arg("image_size"), py::arg("num_coils"), py::arg("sense_maps") = py::none(), py::arg("density_comp") = py::none(), py::arg("kernel_width") = 3, py::arg("sector_width") = 8, py::arg("osr") = 2, py::arg("balance_workload") = true, py::arg("gpu_device_id") = 0)

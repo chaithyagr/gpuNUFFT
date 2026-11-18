@@ -10,6 +10,42 @@ import subprocess
 
 release_info = {}
 
+# ---------------------------------------------------------------------------
+# Binary wheel configuration
+#
+# When GPUNUFFT_WHEEL_CUDA is set (e.g. "13.0", done by cibuildwheel, see
+# pyproject.toml), the extension is built for redistribution:
+#   * the CUDA runtime is linked statically,
+#   * cuFFT (the only CUDA library used) is NOT bundled; it is declared as a
+#     dependency on NVIDIA's pip package and found through an RPATH relative
+#     to the module ($ORIGIN/nvidia/...).
+# When it is unset (plain `pip install` from the sdist), the extension is built
+# against the local CUDA toolkit exactly as before, with no extra dependencies.
+# ---------------------------------------------------------------------------
+WHEEL_CUDA_CONFIGS = {
+    "13": {
+        "name": "gpuNUFFT",
+        "install_requires": ["nvidia-cufft>=12.0,<13"],  # cuFFT of CUDA 13.x
+        "rpath": "$ORIGIN/nvidia/cu13/lib",
+    },
+    "12": {
+        "name": "gpuNUFFT-cu12",
+        "install_requires": ["nvidia-cufft-cu12>=11.0,<12"],  # cuFFT of CUDA 12.x
+        "rpath": "$ORIGIN/nvidia/cufft/lib",
+    },
+}
+
+WHEEL_CUDA = os.environ.get("GPUNUFFT_WHEEL_CUDA", "").strip()
+if WHEEL_CUDA:
+    _major = WHEEL_CUDA.split(".")[0]
+    if _major not in WHEEL_CUDA_CONFIGS:
+        raise RuntimeError(
+            "GPUNUFFT_WHEEL_CUDA={} is not supported, use one of {}".format(
+                WHEEL_CUDA, sorted(WHEEL_CUDA_CONFIGS)))
+    WHEEL_CONFIG = WHEEL_CUDA_CONFIGS[_major]
+else:
+    WHEEL_CONFIG = None
+
 class CMakeExtension(Extension):
 
     def __init__(self, name, sourcedir):
@@ -64,9 +100,19 @@ class CMakeBuild(build_ext):
             os.path.dirname(self.get_ext_fullpath(ext.name)))
         cmake_args = ["-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + extdir,
                       "-DPYTHON_EXECUTABLE=" + sys.executable,
+                      "-DPython3_EXECUTABLE=" + sys.executable,
                       "-DGEN_PYTHON_FILES=ON",
                       "-DGEN_MEX_FILES=OFF",
                       "-DPYBIND11_INCLUDE_DIR=" + self.pybind_path]
+        if WHEEL_CONFIG is not None:
+            cmake_args += [
+                "-DCUDA_USE_STATIC_CUDA_RUNTIME=ON",
+                "-DGPUNUFFT_RPATH=" + WHEEL_CONFIG["rpath"],
+                "-DGEN_ATM_LIB=OFF",
+            ]
+        # Extra user supplied arguments, e.g.
+        # GPUNUFFT_CMAKE_ARGS="-DGPUNUFFT_CUDA_ARCHITECTURES=89"
+        cmake_args += os.environ.get("GPUNUFFT_CMAKE_ARGS", "").split()
         cfg = "Debug" if self.debug else "Release"
         build_args = ["--config", cfg]
 
@@ -78,7 +124,9 @@ class CMakeBuild(build_ext):
             build_args += ['--', '/m']
         else:
             cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
-            build_args += ['--', '-j8']
+            jobs = os.environ.get("CMAKE_BUILD_PARALLEL_LEVEL",
+                                  str(os.cpu_count() or 8))
+            build_args += ['--', '-j' + jobs]
 
         # Call cmake in specific environment
         env = os.environ.copy()
@@ -99,7 +147,7 @@ class CMakeBuild(build_ext):
         print()
 
 setup(
-    name="gpuNUFFT",
+    name=WHEEL_CONFIG["name"] if WHEEL_CONFIG else "gpuNUFFT",
     version="0.10.8",
     description="gpuNUFFT - An open source GPU Library for 3D Gridding and NUFFT",
     ext_modules=[
@@ -108,5 +156,7 @@ setup(
     cmdclass={
         "build_ext": CMakeBuild,
     },
+    install_requires=WHEEL_CONFIG["install_requires"] if WHEEL_CONFIG else [],
+    python_requires=">=3.8",
     zip_safe=False
 )

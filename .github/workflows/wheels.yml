@@ -1,0 +1,94 @@
+name: Build wheels
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    tags: ["v*"]
+  release:
+    types: [published]
+
+jobs:
+  build_wheels:
+    name: Wheels CUDA ${{ matrix.cuda }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # "gpuNUFFT": CUDA 13, NVIDIA driver >= 580, Turing (sm_75) or newer.
+          - cuda: "13.0"
+            arch: x86_64
+            runner: ubuntu-latest
+          # "gpuNUFFT-cu12": CUDA 12, NVIDIA driver >= 525, Turing (sm_75) or newer.
+          - cuda: "12.8"
+            arch: x86_64
+            runner: ubuntu-latest
+          # Uncomment for ARM64 servers (Grace Hopper / GB200, ...).
+          # - cuda: "13.0"
+          #   arch: aarch64
+          #   runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - uses: pypa/cibuildwheel@v3.4.1
+        env:
+          CIBW_ARCHS_LINUX: ${{ matrix.arch }}
+          CIBW_ENVIRONMENT_LINUX: GPUNUFFT_WHEEL_CUDA=${{ matrix.cuda }} PATH=/usr/local/cuda/bin:$PATH
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-cuda${{ matrix.cuda }}-${{ matrix.arch }}
+          path: wheelhouse/*.whl
+
+  build_sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx run build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  # Each PyPI project needs a trusted publisher configured for this workflow
+  # file and the matching GitHub environment ("pypi" / "pypi-cu12").
+  publish:
+    name: Publish gpuNUFFT to PyPI
+    needs: [build_wheels, build_sdist]
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-cuda13*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish_cu12:
+    name: Publish gpuNUFFT-cu12 to PyPI
+    needs: [build_wheels]
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+    environment: pypi-cu12
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-cuda12*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1

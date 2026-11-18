@@ -5,3 +5,35 @@ requires = [
     "cmake>=3.18",
 ]
 build-backend = "setuptools.build_meta"
+
+# ---------------------------------------------------------------------------
+# Binary wheels (cibuildwheel). See scripts/build_wheels.sh and
+# .github/workflows/wheels.yml. Default: CUDA 13.0.
+# To build a CUDA 12 variant (distribution name gpuNUFFT-cu12), override
+#   CIBW_ENVIRONMENT_LINUX='GPUNUFFT_WHEEL_CUDA=12.8 PATH=/usr/local/cuda/bin:$PATH'
+# ---------------------------------------------------------------------------
+[tool.cibuildwheel]
+build = "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
+skip = "*-musllinux_* *_i686"
+build-verbosity = 1
+# Smoke test only: CI machines have no GPU. Importing checks that the module
+# loads and finds cuFFT from the nvidia-cufft pip dependency via its RPATH.
+test-command = "python -c \"import gpuNUFFT; print('gpuNUFFT OK, built with CUDA', gpuNUFFT.cuda_runtime_version)\""
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
+before-all = "bash {project}/scripts/install_cuda_manylinux.sh"
+environment = { GPUNUFFT_WHEEL_CUDA = "13.0", PATH = "/usr/local/cuda/bin:$PATH" }
+# cuFFT is provided by the nvidia-cufft pip package declared as a dependency;
+# never graft CUDA libraries into the wheel (cuFFT alone is ~300 MB).
+repair-wheel-command = """\
+auditwheel repair -w {dest_dir} {wheel} \
+  --exclude 'libcufft.so.*' \
+  --exclude 'libcublas.so.*' \
+  --exclude 'libcublasLt.so.*' \
+  --exclude 'libcurand.so.*' \
+  --exclude 'libcudart.so.*' \
+  --exclude 'libcuda.so.*'\
+"""
