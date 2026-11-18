@@ -148,7 +148,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name=WHEEL_CONFIG["name"] if WHEEL_CONFIG else "gpuNUFFT",
-    version="0.10.8",
+    version="0.11.0",
     description="gpuNUFFT - An open source GPU Library for 3D Gridding and NUFFT",
     ext_modules=[
         CMakeExtension("gpuNUFFT", sourcedir=os.path.join("CUDA")),
