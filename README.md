@@ -100,8 +100,56 @@ Python Bindings
 
 Now we have support for python bindings. Bindings written by Chaithya G R and Carole Lazarus.
 
-For using the python bindings, install from git repository:
+### Installing pre-built wheels (Linux x86_64)
 
-`pip install git+https://github.com/andyschwarzl/gpuNUFFT`
+Pre-built wheels do **not** need a local CUDA toolkit or compiler. cuFFT is
+pulled in automatically from NVIDIA's pip packages and the CUDA runtime is
+built in. Only an NVIDIA driver is required. Pick the package that matches your
+driver (`nvidia-smi` shows the supported "CUDA Version" in its header):
+
+| Package | Built with | NVIDIA driver | GPUs |
+|---|---|---|---|
+| `pip install gpuNUFFT` | CUDA 13 | >= 580 (CUDA 13.x) | Turing (RTX 20xx, T4) or newer |
+| `pip install gpuNUFFT-cu12` | CUDA 12 | >= 525 (CUDA 12.x) | Turing (RTX 20xx, T4) or newer |
+
+Install only one of the two: both provide the `gpuNUFFT` module. If the driver
+is too old for the installed package, `import gpuNUFFT` emits a
+`RuntimeWarning` explaining the mismatch, and you can check with:
+
+```python
+import gpuNUFFT
+gpuNUFFT.cuda_runtime_version   # CUDA version gpuNUFFT was built with, e.g. 13000
+gpuNUFFT.cuda_driver_version()  # CUDA version supported by your driver, 0 = no driver
+```
+
+### Building from source
+
+For older GPUs (Maxwell/Pascal/Volta), other platforms, or to compile against
+your locally installed CUDA toolkit, build from source. This needs the CUDA
+toolkit (`nvcc`) and CMake:
+
+```bash
+pip install --no-binary gpuNUFFT gpuNUFFT                  # from the PyPI sdist
+pip install git+https://github.com/andyschwarzl/gpuNUFFT   # from git
+```
+
+To speed up the build, or to target GPUs not in the default list, you can
+restrict or change the compiled architectures:
+
+```bash
+GPUNUFFT_CMAKE_ARGS="-DGPUNUFFT_CUDA_ARCHITECTURES=61" pip install --no-binary gpuNUFFT gpuNUFFT
+```
+
+### Building the wheels
+
+Wheels are built with [cibuildwheel](https://cibuildwheel.pypa.io) inside a
+manylinux container (needs Docker or Podman), see `pyproject.toml` and
+`.github/workflows/wheels.yml`:
+
+```bash
+scripts/build_wheels.sh                        # CUDA 13 -> gpuNUFFT
+CUDA=12.8 scripts/build_wheels.sh              # CUDA 12 -> gpuNUFFT-cu12
+CIBW_BUILD='cp312-*' scripts/build_wheels.sh   # a single Python version
+```
 
 To see the usage, please check gpuNUFFT/python or use the NonCartesianFFT class from [pysap-mri](https://github.com/CEA-COSMIC/pysap-mri/)

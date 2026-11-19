@@ -96,38 +96,45 @@ endif(GPU_DOUBLE_PREC)
 set(MY_NVCC_FLAGS -I${CUDA_INCLUDE_DIRS})
 set(CMAKE_CXX_FLAGS -I${CUDA_INCLUDE_DIRS})
 
-  if(${CUDA_VERSION_MAJOR} GREATER 9)
-    message("add CUDA 10 flags: Current version: ${CUDA_VERSION}")
-    list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_75,code=sm_75)
-  endif()
-  
-  # Add support for Ada Lovelace (RTX 40-series / RTX Ada Generation)
-  if(${CUDA_VERSION_MAJOR} GREATER 11)
-      message("add CUDA 12 flags: Current version: ${CUDA_VERSION}")
-      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_89,code=sm_89)
-  endif()
+# ---------------------------------------------------------------------------
+# GPU architectures
+#
+# GPUNUFFT_CUDA_ARCHITECTURES: semicolon separated list of SM versions to build
+# native code (SASS) for, e.g. "75;80;86;89;90;100;120". If empty, a default
+# list depending on the CUDA toolkit version is used.
+# PTX for the newest architecture in the list is embedded as well, so that GPUs
+# newer than anything in the list can still run gpuNUFFT (JIT compiled by the
+# driver on first use).
+# ---------------------------------------------------------------------------
+SET(GPUNUFFT_CUDA_ARCHITECTURES "" CACHE STRING "SM architectures to compile for (e.g. 75;80;86;89;90;100;120). Empty = default for toolkit")
 
-  # --- Ampere (RTX 30-series / A100) ---
+if(NOT GPUNUFFT_CUDA_ARCHITECTURES)
+  set(GPUNUFFT_CUDA_ARCHITECTURES "")
+  # Turing (RTX 20-series, T4). CUDA 13 dropped everything older than sm_75.
+  if(${CUDA_VERSION_MAJOR} GREATER 9)
+    list(APPEND GPUNUFFT_CUDA_ARCHITECTURES 75)
+  endif()
+  # Ampere (RTX 30-series / A100)
   if(${CUDA_VERSION_MAJOR} GREATER 10)
-      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_80,code=sm_80)
-      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_86,code=sm_86)
+    list(APPEND GPUNUFFT_CUDA_ARCHITECTURES 80 86)
   endif()
-  
-  # --- Ada Lovelace (Your RTX 6000 Ada) & Hopper (H100) ---
+  # Ada Lovelace (RTX 40-series / RTX Ada) & Hopper (H100)
   if(${CUDA_VERSION_MAJOR} GREATER 11)
-      # Your current GPU (Ada)
-      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_89,code=sm_89)
-      # Hopper (Data Center H100)
-      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_90,code=sm_90)
+    list(APPEND GPUNUFFT_CUDA_ARCHITECTURES 89 90)
   endif()
-  
-  # --- Blackwell (RTX 50-series / B200) ---
-  # Note: Requires CUDA 12.8 or 13.0+
+  # Blackwell (B200 / RTX 50-series). Requires CUDA 12.8+
   if(${CUDA_VERSION} VERSION_GREATER_EQUAL "12.8")
-      message("Adding Blackwell support")
-      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_100,code=sm_100)
-      list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_120,code=sm_120)
+    list(APPEND GPUNUFFT_CUDA_ARCHITECTURES 100 120)
   endif()
+endif()
+
+message(STATUS "CUDA ${CUDA_VERSION}: building SASS for sm_${GPUNUFFT_CUDA_ARCHITECTURES}")
+foreach(_arch ${GPUNUFFT_CUDA_ARCHITECTURES})
+  list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_${_arch},code=sm_${_arch})
+endforeach()
+list(GET GPUNUFFT_CUDA_ARCHITECTURES -1 _ptx_arch)
+message(STATUS "Embedding PTX for compute_${_ptx_arch} (forward compatibility)")
+list(APPEND MY_NVCC_FLAGS -gencode=arch=compute_${_ptx_arch},code=compute_${_ptx_arch})
 
 
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
